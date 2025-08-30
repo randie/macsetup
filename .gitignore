@@ -1,0 +1,7 @@
+*.swp
+.DS_Store
+.Trash
+.local
+**/*,*
+
+~/macsetup*

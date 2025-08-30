@@ -1,0 +1,5 @@
+#!/bin/ksh
+for i in $(docker --tlsverify=false images | cut -d " " -f1 | sort -u); do 
+echo "------------------------------------------------- $i"
+docker --tlsverify=false images | grep $i | sed s#artifactory.sweetspotdiabetesops.com/##g
+done 

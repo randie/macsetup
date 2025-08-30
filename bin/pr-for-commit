@@ -1,0 +1,14 @@
+#!/usr/bin/env ksh
+# credit: http://joey.aghion.com/find-the-github-pull-request-for-a-commit/
+
+USAGE="Usage: ${0##*/} <commit>"
+[[ $# < 1 ]] && { print -u2 $USAGE; exit 1; } 
+
+# TODO: allow UPSTREAM and REPO to be overriden by command line args
+# e.g. pr-for-commit -u sweetspot -r productdev 1dad53662595cb36fee945b2bfd7472cb83bbf4e
+
+UPSTREAM=sweetspot
+REPO=productdev
+URL=https://github.com/${UPSTREAM}/${REPO}/pull/
+git log --merges --ancestry-path --oneline ${1}..master | grep 'pull request' | tail -n1 | cut -d ' ' -f5 | cut -c2- | xargs -I % open ${URL}%
+

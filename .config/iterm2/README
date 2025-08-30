@@ -1,0 +1,17 @@
+╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:29 PM
+╰─❯ date
+Thu Aug 28 18:59:39 PDT 2025
+
+╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:39 PM
+╰─❯ c rev-parse --short HEAD
+a9c406f
+
+╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 07:00:20 PM
+╰─❯ ls -l
+total 672
+lrwxr-xr-x@ 1 randie  staff      48 Aug 27 15:36 AppSupport -> /Users/randie/Library/Application Support/iTerm2
+-rw-r--r--@ 1 randie  staff  110763 Aug 28 18:53 com.googlecode.iterm2.plist
+-rw-r--r--@ 1 randie  staff  110967 Dec 22  2022 com.googlecode.iterm2.plist-221222
+-rw-r--r--@ 1 randie  staff  110763 Feb 16  2025 com.googlecode.iterm2.plist-250216
+drwx------@ 3 randie  staff      96 Aug 27 15:36 sockets
+

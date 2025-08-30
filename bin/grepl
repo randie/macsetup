@@ -1,0 +1,24 @@
+#! /bin/ksh
+
+USAGE="Usage: ${0##*/} <pattern> <filelist>"
+EXAMPLE="Example: ${0##*/} error_log /tmp/list_of_files"
+
+if (( $# != 2 ))
+then
+  print -u2 ERROR: Bad command line. Try again.
+  print -u2 $USAGE
+  print -u2 $EXAMPLE
+else
+  for i in $(<$2)
+  do
+    if (test -f $i)
+    then
+      #(( $(grep -wc "$1" $i ) == 0 )) || echo $i
+      #(( $(grep -c "$1" $i ) == 0 )) || echo $i
+      (( $(grep -ic "$1" $i ) == 0 )) || echo $i
+    else
+      print -u2 WARNING: File $i does not exist.
+      continue
+    fi
+  done
+fi

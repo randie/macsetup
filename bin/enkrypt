@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# TO DO
+#   1. option -shred     mv original to $HOME/tmp/to-shred/
+#   2. recursively encrypt a directory of files
+#   2. cd to directory containing file/directory 
+#
+# Notes:
+#   1. You must first cd to the directory containing the file or directory to be encrypted
+
+encrypt_file() {
+    /usr/bin/openssl enc -aes-256-cbc -a -salt -in $1 -out $2
+    if  (( $? !=  0 ))
+    then
+        echo ERROR! failed to encrypt $1
+    else
+        echo ORIGINAL: $1
+        echo ENCRYPTED: $2
+    fi
+}
+
+encrypt_dir() {
+    echo ERROR! "Can't encrypt directories yet, sorry."
+}
+
+if [ $(dirname $1) != '.' ]
+then
+    echo "USAGE: cd $(dirname $1); ${0##*/} $(basename $1)"
+    exit 1
+fi
+
+if  [  -d  $1  ]
+then
+    outdir=x-$(date +%H%M%S)-$1
+    encrypt_dir $1 $outdir
+else
+    outfile=x-$(date +%H%M%S)-$1
+    encrypt_file $1 $outfile
+fi

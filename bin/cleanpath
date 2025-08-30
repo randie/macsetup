@@ -1,0 +1,46 @@
+#!/usr/bin/awk -f
+#
+# Remove empty and duplicate path elements
+#
+# Set the input field separator character to ':'
+#
+BEGIN { FS = ":" }
+
+#
+# Main body: read the path and process the elements
+#
+{
+	pathSize = 0
+	path = ""
+
+	for (poCount = 1; poCount <= NF; poCount++) {
+		#
+		# Remove empty entries
+		#
+		elt = $poCount
+		if (elt == "")
+			continue
+
+		#
+		# Check for duplicates and add the element if it is new
+		#
+		found = 0
+		for (piCount = 0; piCount < pathSize; piCount++) {
+			if (elt == pathArray[piCount]) {
+				found = 1
+				break
+			}
+		}
+		if (found == 0) {
+			pathArray[pathSize++] = elt
+			if (pathSize == 1)
+				path = elt
+			else
+				path = path ":" elt
+		}
+	}
+
+	print path
+}
+
+END { }

@@ -1,0 +1,17 @@
+# vscode's settings.json 230105
+{
+    "editor.fontSize": 18,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "jupyter.sendSelectionToInteractiveWindow": true,
+    "python.analysis.typeCheckingMode": "strict",
+    "python.formatting.provider": "black",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "terminal.integrated.fontSize": 18,
+    "vim.smartRelativeLine": true,
+    "workbench.colorTheme": "Default Dark+",
+    "workbench.iconTheme": "simple-icons"
+} 

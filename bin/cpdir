@@ -1,0 +1,110 @@
+#!/bin/ksh
+# @(#) cpdir v1.0 - Copy Directory    Author: Randie Bemis 4/30/93
+
+#
+# Usage:  cpdir [-mov] <srcdir> <destdir>
+#
+# Description:  cpdir copies <srcdir> to <destdir> according to the options
+#               specified by the user.
+#
+# Options:      m - Merge <srcdir> into <destdir>.
+#               o - Overwrite <destdir> with <srcdir>.
+#               v - Verbose.
+#
+# Notes:
+#
+#   1. If -m and -o are specified together, the less destructive option
+#      is chosen (i.e. -o is ignored).
+#      (FIXME: Make -m and -o mutually exclusive, i.e. do not allow
+#       user to specify both options.)
+#   2. In non-verbose mode, cpio still spits out "1 blocks".
+#
+
+# Uncomment next line, if debugging this script.
+# set -x
+
+# FIXME: Trap interrupts to cleanup routine.
+
+# Set/Initialize globals.
+Ans=
+Cmd="$0 $*"
+Cwd=$PWD
+Destdir=
+Merge=
+Opt=
+Overwrite=
+Srcdir=
+Usage="Usage: ${0##*/} [-mov] <srcdir> <destdir>"
+Verbose=
+
+# Process command line arguments.
+while getopts mov opt
+do
+    case $opt in
+    m) Merge=TRUE               ;;
+    o) Overwrite=TRUE           ;;
+    v) Verbose=TRUE             ;;
+    *) print -u2 $Usage; exit 1 ;;
+    esac
+done
+shift $(( OPTIND-1 ))  # shift options away
+[[ $# < 2 ]] && { print -u2 $Usage; exit 1; }
+[ $Verbose ] && Opt="-pduv" || Opt="-pdu"
+Srcdir=$1
+Destdir=$2
+
+[ -d $Srcdir ] || { print -u2 "(${0##*/}) Error: \"$Srcdir\" does not exist."; exit 1; }
+
+# Prep destination directory.
+umask 0
+if [ -d $Destdir ]
+then
+    if [ $Merge ]
+    then
+        [ $Overwrite ] &&  print -u2 "(${0##*/}) Warning: Ignoring \"-o\". "
+    elif [ $Overwrite ]
+    then
+        rm -rf $Destdir > /dev/null 2>&1
+        if [[ $? = 0 ]]
+        then
+            mkdir $Destdir
+        else
+            print -u2 "(${0##*/}) Error: Unable to overwrite \"$Destdir\". Check permissions."
+            exit 1
+        fi
+    else
+        print -u2 "(${0##*/}) Warning: Destination \"$Destdir\" exists already ..."
+        PS3="Pick one: "
+        select Action in Overwrite Merge Exit
+        do
+            case $Action in
+            Overwrite) 
+                rm -rf $Destdir > /dev/null 2>&1
+                if [[ $? = 0 ]]
+                then    
+                    mkdir $Destdir
+                else
+                    print -u2 "(${0##*/}) Error: Unable to overwrite \"$Destdir\". Check permissions."
+                    exit 1
+                fi
+                break ;;
+            Merge)    break ;;
+            Exit)    exit 1 ;;
+            *)    print -nu2 "Invalid response. Try again, "
+                PS3="pick one: " ;;
+            esac
+        done
+    fi
+else
+    mkdir $Destdir
+fi
+
+# Perform the actual copy.
+cd $Srcdir
+if [[ -z ${Destdir%%/*} ]]  # if absolute path
+then
+    find . -depth -print | cpio $Opt $Destdir
+else
+    find . -depth -print | cpio $Opt $Cwd/$Destdir
+fi
+exit $?

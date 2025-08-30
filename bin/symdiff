@@ -1,0 +1,45 @@
+#! /bin/sh
+# @(#) symdiff.sh 1.1 4/22/93 @(#)
+Author: Chuck Klang
+
+program_name=`basename $0`
+
+tmp_dir=/tmp
+file_1=${tmp_dir}/${program_name}_1_$$
+file_2=${tmp_dir}/${program_name}_2_$$
+file_12=${tmp_dir}/${program_name}_12_$$
+file_12_uniq=${tmp_dir}/${program_name}_12_uniq_$$
+
+first_file=$1
+second_file=$2
+
+if [ ! -f ${first_file} ]; then
+	echo "File ${first_file} does not exist"
+	exit 1
+fi
+
+if [ ! -f ${second_file} ]; then
+	echo "File ${second_file} does not exist"
+	exit 1
+fi
+
+sort ${first_file} > ${file_1}
+sort ${second_file} > ${file_2}
+
+sort -m ${file_1} ${file_2} > ${file_12}
+
+uniq -u ${file_12} > ${file_12_uniq}
+
+echo ""
+
+echo "Files found only in ${first_file}"":"
+sort -m ${file_12_uniq} ${file_1} | uniq -d
+
+echo ""
+
+echo "Files found only in ${second_file}"":"
+sort -m ${file_12_uniq} ${file_2} | uniq -d
+
+rm ${file_1} ${file_2} ${file_12} ${file_12_uniq}
+
+exit

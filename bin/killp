@@ -1,0 +1,72 @@
+#!/bin/ksh
+
+# description: kill named processes
+# usage: killp <process-name>
+# options:
+#     -f = force, just do it, don't bother to confirm
+#     -a = kill only Application processes (TODO)
+
+COMMAND=${0##*/}
+USAGE="\n\tUSAGE: $COMMAND [-fa] <process-name>\n\te.g. $COMMAND httpd\n"
+CONFIRM=true
+APPONLY=
+
+# Process command options
+while getopts af opt
+do
+    case $opt in
+    a) APPONLY=true ;;
+    f) CONFIRM= ;;
+    *) print -u2 $USAGE; exit 1 ;;
+    esac
+done
+# shift command options away
+shift $(( OPTIND-1 ))
+
+# check if valid command usage
+if (($# != 1)) 
+then
+  print -u2 $USAGE
+  return
+fi
+
+# list processes to kill
+#ps -aux | grep Applications | grep -iw $1 | egrep -vw "grep|$COMMAND" 
+#ps -aux | grep -iw $1 | egrep -vw "grep|$COMMAND" 
+ps -ajx | grep -iw $1 | egrep -vw "grep|$COMMAND" 
+if (( $? > 0 ))
+then
+    print -u1 "No process named \"$1\". Good-bye!"
+    exit;
+fi
+echo "----------"
+
+ if [ $CONFIRM ]
+ then           
+    # pause, confirm next action
+    print -u2 "Now what?"
+    PS3="pick one: "
+    select next in kill cancel
+    do
+        case $next in
+            kill) break ;;
+            cancel)   print -u1 "Cancelled. Good-bye!"; exit ;;
+            *)        print -nu2 "Invalid response. Try again, "
+            PS3="pick one: " ;;
+        esac
+    done
+    print -u1 "Killing ..." 
+fi
+
+# kill 'em
+#for i in $(ps -aux | grep Application | grep -iw $1 | egrep -vw "grep|$COMMAND" | sed -E 's/[ ]+/,/g' | cut -d',' -f2)
+#for i in $(ps -aux | grep -iw $1 | egrep -vw "grep|$COMMAND" | sed -E 's/[ ]+/,/g' | cut -d',' -f2)
+for i in $(ps -ajx | grep -iw $1 | egrep -vw "grep|$COMMAND" | sed -E 's/[ ]+/,/g' | cut -d',' -f2)
+do
+  user=$(ps -o user -p $i | grep -v USER)
+  if [[ $user = "root" ]]
+  then
+      prefix="sudo"
+  fi
+  $prefix kill -SIGTERM $i && echo killed process $i
+done

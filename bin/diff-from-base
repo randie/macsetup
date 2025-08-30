@@ -1,0 +1,11 @@
+#!/usr/bin/env ksh
+
+# TODO:
+#   1. accept argument - branch to find the base of (default is current branch)
+#   2. output the following
+#      a. the SHA of the base commit
+#      b. list of files that changed between the base and the head of branch
+#      c. if -v, then a, b and each files diffs
+
+#diff -u <(git rev-list --first-parent rb/2601-modal-day-heat-map-v3) <(git rev-list --first-parent upstream/master) | sed -ne 's/^ //p' | head -1
+diff -u <(git rev-list --first-parent ${1}) <(git rev-list --first-parent upstream/master) | sed -ne 's/^ //p' | head -1

@@ -1,0 +1,13 @@
+#!/usr/bin/perl -w
+
+use Cwd;
+
+if (@ARGV > 0) {
+  foreach (@ARGV) {
+    $path = Cwd::abs_path($_);
+    print ((-e)? "$path\n" : "$_ does not exist!\n");
+  }
+}
+else {
+  print Cwd::abs_path("."), "\n";
+}
