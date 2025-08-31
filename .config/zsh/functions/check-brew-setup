@@ -1,0 +1,13 @@
+check-brew-setup() {
+  echo ">>> Checking Homebrew + command-not-found integration"
+  local prefix brew_bin handler
+  prefix=$(brew --prefix 2>/dev/null)
+  brew_bin=$(command -v brew 2>/dev/null)
+  handler=$(typeset -f command_not_found_handler 2>/dev/null | grep -q HOMEBREW_NO_AUTO_UPDATE && echo OK || echo BROKEN)
+  [[ -z "$prefix" || -z "$brew_bin" ]] && echo "❌ Homebrew not found" || {
+    echo "✅ Homebrew prefix: $prefix"
+    echo "✅ brew binary:    $brew_bin"
+  }
+  [[ "$handler" == "OK" ]] && echo "✅ command_not_found_handler wrapper is active" || echo "❌ command_not_found_handler is missing or unwrapped"
+  echo; echo ">>> Testing missing command (foobar123)"; foobar123
+}

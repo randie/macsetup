@@ -1,0 +1,5 @@
+dc() {
+  local cmd="$1"; shift
+  echo "╰─❯ docker-compose --env-file docker-compose.env ${cmd} --remove-orphans --build $*"
+  docker-compose --env-file docker-compose.env "$cmd" --remove-orphans --build "$@"
+}

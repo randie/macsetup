@@ -1,0 +1,12 @@
+my_conda_init() {
+  __conda_setup="$('/usr/local/anaconda3/bin/conda' 'shell.zsh' 'hook' 2>/dev/null)"
+  if [[ $? -eq 0 ]]; then
+    eval "$__conda_setup"
+  elif [[ -f "/usr/local/anaconda3/etc/profile.d/conda.sh" ]]; then
+    . "/usr/local/anaconda3/etc/profile.d/conda.sh"
+  else
+    PATH="/usr/local/anaconda3/bin:$PATH"
+    export PATH
+  fi
+  unset __conda_setup
+}

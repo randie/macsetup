@@ -1,0 +1,11 @@
+shred() {
+  if [[ -z "$1" ]]; then echo "Usage: shred <filename>"; return 1; fi
+  local file="$1"
+  if [[ ! -f "$file" ]]; then echo "ERROR! '$file' is not a valid file."; return 1; fi
+  local file_size block_count
+  file_size=$(stat -f%z "$file" 2>/dev/null || stat -c %s "$file")
+  block_count=$(( (file_size + 1048575) / 1048576 ))
+  dd if=/dev/urandom of="$file" bs=1m count="$block_count" 2>/dev/null
+  \rm -f -- "$file"
+  echo "Poof! $file is gone."
+}

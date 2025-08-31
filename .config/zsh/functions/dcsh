@@ -1,0 +1,5 @@
+dcsh() {
+  if [[ -z "$1" ]]; then echo "Usage: dcsh <service>"; return 1; fi
+  echo "╰─❯ docker-compose --env-file docker-compose.env exec ${1} /bin/bash"
+  docker-compose --env-file docker-compose.env exec "$1" /bin/bash
+}

@@ -1,0 +1,23 @@
+fix-brew-setup() {
+  echo ">>> Fixing Homebrew + command-not-found integration"
+  if [[ -x /opt/homebrew/bin/brew ]]; then eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [[ -x /usr/local/bin/brew ]]; then eval "$(/usr/local/bin/brew shellenv)"; fi
+  if ! command -v brew >/dev/null 2>&1; then echo "❌ Homebrew not found; cannot continue."; return 1; fi
+  local repo handler
+  repo="$(brew --repository 2>/dev/null)"
+  handler="$repo/Library/Taps/homebrew/homebrew-command-not-found/handler.sh"
+  [[ ! -r "$handler" ]] && { echo "❌ handler not found at $handler"; echo "   (brew tap homebrew/command-not-found)"; return 1; }
+  source "$handler"
+  if typeset -f command_not_found_handler >/dev/null 2>&1; then
+    if ! typeset -f __command_not_found_handler_orig >/dev/null 2>&1; then
+      functions -c command_not_found_handler __command_not_found_handler_orig
+      command_not_found_handler() { HOMEBREW_NO_AUTO_UPDATE=1 __command_not_found_handler_orig "$@"; }
+      echo "✅ Wrapped command_not_found_handler"
+    else
+      echo "ℹ️  Wrapper already present"
+    fi
+  else
+    echo "❌ command_not_found_handler not defined"; return 1
+  fi
+  echo; check-brew-setup 2>/dev/null || echo "⚠️  Run 'foobar123' to test manually."
+}

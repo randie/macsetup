@@ -1,0 +1,10 @@
+brewfile() {
+  # XDG-friendly wrapper for `brew bundle`
+  local brewfile_path="${XDG_CONFIG_HOME:-$HOME/.config}/brew/Brewfile"
+  if [[ ! -r "$brewfile_path" ]]; then
+    echo "Brewfile not found at: $brewfile_path" >&2
+    echo "Create it, or run: brew bundle dump --file=\"$brewfile_path\" --force" >&2
+    return 1
+  fi
+  brew bundle --file="$brewfile_path" "$@"
+}
