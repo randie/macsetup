@@ -14,7 +14,7 @@ My Mac configuration files and setup script for quickly bootstrapping a new MacB
 # Step 1: Clone the bare repo
 git clone --bare git@github.com:randie/macsetup.git $HOME/macsetup-bare
 
-# Step 2: Check out macsetup.sh from the bare repo into ~/bin
+# Step 2: Check out macsetup.sh from the bare repo
 git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
 
 # Step 3: Run it
