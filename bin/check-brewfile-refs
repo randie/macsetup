@@ -1,0 +1,35 @@
+#!/usr/bin/env zsh
+#
+# check-brewfile-refs — scan for references to ~/.Brewfile
+#
+# Exit codes:
+#   0 = no references found
+#   1 = references found
+
+set -euo pipefail
+
+found=0
+
+echo ">>> Scanning for references to ~/.Brewfile under \$HOME"
+echo
+
+if ! grep -R --color=always --include='*.{zsh,sh,bash,rc,conf,yml,yaml,toml,json}' '\.Brewfile' "$HOME" 2>/dev/null; then
+  echo "No matches found in \$HOME"
+else
+  found=1
+fi
+
+echo
+echo ">>> Checking ~/bin for references"
+if ! grep -R --color=always '\.Brewfile' "$HOME/bin" 2>/dev/null; then
+  echo "No matches found in ~/bin"
+else
+  found=1
+fi
+
+echo
+echo ">>> (Optional) Check system-wide configs (may require sudo)"
+echo "    sudo grep -R --color=always '\\.Brewfile' /etc 2>/dev/null"
+
+exit $found
+
