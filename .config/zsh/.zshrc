@@ -37,35 +37,10 @@ KEYTIMEOUT=5
 # Added to fpath so functions can be autoloaded like built-ins.
 ZFUNCDIR="$XDG_CONFIG_HOME/zsh/functions"
 
-PATH="$PATH:$HOME/bin"
-
-if [[ "$(uname -s)" == "Darwin" ]]; then  # if macOS
-  HOSTNAME="$(scutil --get LocalHostName 2>/dev/null || hostname)"
-else
-  HOSTNAME="$(uname -n)"
-fi
-
-if [[ -n "$SSH_CONNECTION" ]]; then  # if SSH'd into a remote machine
-  EDITOR="vim"
-else
-  if command -v mvim >/dev/null 2>&1; then
-    # prefer mvim for local GUI sessions
-    EDITOR="mvim"
-  else
-    EDITOR="vim"
-  fi
-fi
-VISUAL="$EDITOR"
-PAGER="less"
-
-# Default editor for the 'fc' builtin (edit/re-run previous commands).
-FCEDIT="$VISUAL"
-
-# Shell history
+# Shell history (preserve a lot of history)
 HISTFILE="$XDG_STATE_HOME/zsh/history"
 HISTSIZE=200000  # max number of commands kept in memory per session
 SAVEHIST=200000  # max number of commands saved to history file for persistence across sessions
-LESSHISTFILE="$XDG_STATE_HOME/less/history"
 
 # Oh-my-zsh
 ZSH="$HOME/.oh-my-zsh"
@@ -75,36 +50,25 @@ set +o allexport
 
 # --------------------------------- Homebrew ----------------------------------
 
-# Set brew_path based on architecture (temporary helper variable)
-case "$(uname -m)" in
-  arm64)  brew_path="/opt/homebrew" ;;  # Apple Silicon
-  x86_64) brew_path="/usr/local"    ;;  # Intel macOS
-  *)      brew_path="$(brew --prefix 2>/dev/null)" ;; # fallback (Linuxbrew/custom)
-esac
-
-# Bootstrap Homebrew into PATH/MANPATH/etc.
-if [[ -x "$brew_path/bin/brew" ]]; then
-  eval "$("$brew_path/bin/brew" shellenv)"
-fi
-unset brew_path
-
-# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installation,
-# and is set by `brew shellenv`.
+# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installations,
+# and is set by `brew shellenv` in .zprofile.
 
 # Homebrew command-not-found integration
-if [[ -n $HOMEBREW_PREFIX && -r $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
-  source "$HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh"
+_handler_sh="$HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh"
+if [[ -n $HOMEBREW_PREFIX && -r $_handler_sh ]]; then
+  source "$_handler_sh"
 
-  # Wrap to silence auto-update during command-not-found suggestions
-  if typeset -f command_not_found_handler >/dev/null \
-     && ! typeset -f _command_not_found_handler_orig >/dev/null
+  # Silence auto-update during command-not-found suggestions
+  if typeset -f command_not_found_handler >/dev/null && ! typeset -f _handler_copy >/dev/null
   then
-    functions -c command_not_found_handler _command_not_found_handler_orig
+    functions -c command_not_found_handler _handler_copy
     command_not_found_handler() {
-      HOMEBREW_NO_AUTO_UPDATE=1 _command_not_found_handler_orig "$@"
+      HOMEBREW_NO_AUTO_UPDATE=1 _handler_copy "$@"
     }
   fi
 fi
+unset _handler_sh
+unset _handler_copy
 
 # ------------------------- History & shell behavior --------------------------
 
@@ -127,7 +91,7 @@ setopt EXTENDED_GLOB               # enable advanced globbing operators
 
 # ------------------------ Functions: path & autoloading ----------------------
 
-# Put our functions dir on fpath so autoload finds them
+# Put functions dir on fpath so autoload finds them
 fpath=("$ZFUNCDIR" $fpath)
 
 # Autoload each function (one function per file, filename == funcname)
