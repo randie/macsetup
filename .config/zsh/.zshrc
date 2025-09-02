@@ -7,6 +7,15 @@
 
 # -------------------- Powerlevel10k instant prompt (quiet) --------------------
 
+# NOTE: This block should stay close to the top of .zshrc.
+# Initialization code that requires console input (e.g. password prompts,
+# [y/n] confirmations, etc.) should go above this block; everything else
+# goes below.
+
+# Enable Powerlevel10k's instant prompt but silence warnings about writing
+# to stdout/stderr during .zshrc startup. Keeps startup fast/clean. Any
+# messages must be deferred (e.g. via precmd) or logged since early output
+# would garble the prompt.
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 
 # Use XDG cache for P10K’s instant prompt
@@ -18,46 +27,69 @@ fi
 
 set -o allexport
 
-ZFUNCDIR="$XDG_CONFIG_HOME/zsh/functions"
-ZSH="$HOME/.oh-my-zsh"
+# The amount of time (in hundredths of a second) that zsh waits
+# after you hit ESC to see if more keys are coming.
+# Lower values make vi-mode ESC feel snappier.
+# Higher values give you more time to type ESC-prefixed combos.
 KEYTIMEOUT=5
-PAGER="less"
+
+# Directory for your own zsh functions (one file per function).
+# Added to fpath so functions can be autoloaded like built-ins.
+ZFUNCDIR="$XDG_CONFIG_HOME/zsh/functions"
+
 PATH="$PATH:$HOME/bin"
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then  # if macOS
   HOSTNAME="$(scutil --get LocalHostName 2>/dev/null || hostname)"
 else
   HOSTNAME="$(uname -n)"
 fi
 
-if [[ -n "$SSH_CONNECTION" ]]; then
+if [[ -n "$SSH_CONNECTION" ]]; then  # if SSH'd into a remote machine
   EDITOR="vim"
 else
   if command -v mvim >/dev/null 2>&1; then
-    # Editor (prefer mvim when local GUI session)
+    # prefer mvim for local GUI sessions
     EDITOR="mvim"
   else
     EDITOR="vim"
   fi
 fi
 VISUAL="$EDITOR"
+PAGER="less"
+
+# Default editor for the 'fc' builtin (edit/re-run previous commands).
 FCEDIT="$VISUAL"
+
+# Shell history
+HISTFILE="$XDG_STATE_HOME/zsh/history"
+HISTSIZE=200000  # max number of commands kept in memory per session
+SAVEHIST=200000  # max number of commands saved to history file for persistence across sessions
+LESSHISTFILE="$XDG_STATE_HOME/less/history"
+
+# Oh-my-zsh
+ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="powerlevel10k/powerlevel10k"
 
 set +o allexport
 
 # --------------------------------- Homebrew ----------------------------------
 
-# Set BREW_PATH based on architecture
+# Set brew_path based on architecture (temporary helper variable)
 case "$(uname -m)" in
-  arm64)   export BREW_PATH="/opt/homebrew" ;;  # Apple Silicon
-  x86_64)  export BREW_PATH="/usr/local"    ;;  # Intel macOS
-  *)       export BREW_PATH="$(brew --prefix 2>/dev/null)" ;; # fallback (Linuxbrew/custom)
+  arm64)  brew_path="/opt/homebrew" ;;  # Apple Silicon
+  x86_64) brew_path="/usr/local"    ;;  # Intel macOS
+  *)      brew_path="$(brew --prefix 2>/dev/null)" ;; # fallback (Linuxbrew/custom)
 esac
 
 # Bootstrap Homebrew into PATH/MANPATH/etc.
-if [[ -x "$BREW_PATH/bin/brew" ]]; then
-  eval "$("$BREW_PATH/bin/brew" shellenv)"
+if [[ -x "$brew_path/bin/brew" ]]; then
+  eval "$("$brew_path/bin/brew" shellenv)"
 fi
+unset brew_path
+
+# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installation,
+# and is set by `brew shellenv`.
 
 # Homebrew command-not-found integration
 if [[ -n $HOMEBREW_PREFIX && -r $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh ]]; then
@@ -75,14 +107,6 @@ if [[ -n $HOMEBREW_PREFIX && -r $HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-
 fi
 
 # ------------------------- History & shell behavior --------------------------
-
-set -o allexport
-# HISTFILE="$HOME/.zsh_history"
-HISTFILE="$XDG_STATE_HOME/zsh/history"
-HISTSIZE=200000
-SAVEHIST=200000
-LESSHISTFILE="$XDG_STATE_HOME/less/history"
-set +o allexport
 
 # --- History options ---
 setopt HIST_IGNORE_ALL_DUPS        # remove older duplicates, keep the most recent
@@ -137,7 +161,6 @@ fi
 # --------------------------------- Oh My Zsh ---------------------------------
 
 # Keep 'zsh-syntax-highlighting' LAST per its docs; include 'vi-mode'
-ZSH_THEME="powerlevel10k/powerlevel10k"
 plugins=(
   git
   direnv
@@ -163,9 +186,9 @@ alias mv='mv -i'
 alias rm='rm -i'
 alias lsa='ls -a'
 alias h='history'
-alias localhost='scutil --get LocalHostName'
-alias killdock='killall -KILL Dock'
 alias ss='save -s'
+alias killdock='killall -KILL Dock'
+alias localhost='scutil --get LocalHostName'
 alias sshjj='ssh -i ~/.ssh/hostgator_rsa jj@108.179.232.68 -p2222'
 
 # --- Git aliases ---
