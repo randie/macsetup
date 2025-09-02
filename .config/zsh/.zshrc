@@ -59,16 +59,15 @@ if [[ -n $HOMEBREW_PREFIX && -r $_handler_sh ]]; then
   source "$_handler_sh"
 
   # Silence auto-update during command-not-found suggestions
-  if typeset -f command_not_found_handler >/dev/null && ! typeset -f _handler_copy >/dev/null
-  then
+  if typeset -f command_not_found_handler >/dev/null; then
     functions -c command_not_found_handler _handler_copy
     command_not_found_handler() {
       HOMEBREW_NO_AUTO_UPDATE=1 _handler_copy "$@"
     }
+    unset _handler_copy
   fi
 fi
 unset _handler_sh
-unset _handler_copy
 
 # ------------------------- History & shell behavior --------------------------
 
@@ -164,6 +163,7 @@ alias gco='g checkout'
 alias gm='g merge --no-commit --no-ff'
 alias gita='alias | grep git | grep'
 alias glol="g log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
+alias glos='g log --graph --pretty="%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset" --stat'
 alias savepy='gs | grep py | grep " M" | cut -d " " -f3 | xargs save -s'
 
 # --- macsetup bare-repo aliases ---
