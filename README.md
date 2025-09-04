@@ -1,6 +1,6 @@
-# macsetup
+# macsetup (WIP)
 
-My Mac configuration files and setup script for quickly bootstrapping a new MacBook (Intel or Apple Silicon).
+My Mac dot files and setup script for quickly bootstrapping a new MacBook (Intel or Apple Silicon).
 
 > **Note:** This README contains Mermaid diagrams. To preview them locally:
 > - In **VS Code**, install the extension `bierner.markdown-mermaid` (via Homebrew Bundle: `vscode "bierner.markdown-mermaid"`).
@@ -12,10 +12,12 @@ My Mac configuration files and setup script for quickly bootstrapping a new MacB
 
 ```bash
 # Step 1: Clone the bare repo
-git clone --bare git@github.com:randie/macsetup.git $HOME/macsetup-bare
+# This step assumes you already have a github ssh key set up.
+# If not, clone from https://github.com/randie/macsetup.git instead.
+git clone --bare git@github.com:randie/macsetup.git $HOME/macsetup.git
 
 # Step 2: Check out macsetup.sh from the bare repo
-git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
+git --git-dir=$HOME/macsetup.git --work-tree=$HOME checkout main -- bin/macsetup.sh
 
 # Step 3: Run it
 $HOME/bin/macsetup.sh

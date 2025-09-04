@@ -62,12 +62,9 @@ trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s w
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/${MACSETUP}-bare"
-readonly SCRATCH_DIR="$HOME/${MACSETUP}-scratch"
-readonly TRACKED_FILES="$SCRATCH_DIR/tracked-files.txt"
-readonly EXISTING_TRACKED_FILES="$SCRATCH_DIR/existing-tracked-files.txt"
-readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
-readonly BREWFILE="$HOME/.Brewfile"
+readonly BARE_REPO="$HOME/${MACSETUP}.git"
+readonly SCRATCH_DIR="$HOME/.scratch/${MACSETUP}"
+readonly CONFIG_DIR="$HOME/.config"
 
 VERBOSE=false
 NO_COLOR=false
@@ -200,6 +197,8 @@ ensure_homebrew() {
 # ---- brew install packages -----------------------------------------
 
 brew_install_packages() {
+  local -r BREWFILE="$CONFIG_DIR/brew/Brewfile"
+
   ensure_homebrew
 
   [[ ! -f "$BREWFILE" ]] && log_error "$BREWFILE not found" && exit 1
@@ -216,6 +215,9 @@ ensure_bare_repo() {
     local commit branch
 
     if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
+      # If you're running this script, then you should already have
+      # a bare repo in $HOME/macsetup.git since this script would
+      # have been checked out from that bare repo.
       log_verbose "Bare repo already exists"
     else
       log_info "Cloning bare repo"
@@ -231,10 +233,14 @@ ensure_bare_repo() {
 
 # ---- backup existing tracked files ----------------------------------
 
-backup_existing_config() { (
+backup_existing_config() {(
   # NOTE: The parens enclosing this function creates a subshell
   # and runs this function in the subshell, so cd's are confined
   # to the subshell.
+
+  local -r TRACKED_FILES="$SCRATCH_DIR/tracked-files.txt"
+  local -r EXISTING_TRACKED_FILES="$SCRATCH_DIR/existing-tracked-files.txt"
+  local -r BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
   cd $HOME
 
@@ -252,23 +258,26 @@ backup_existing_config() { (
     log_verbose "Created backup: $BACKUP_TAR"
 
     # Remove existing tracked files that were backed up to $BACKUP_TAR
-    for f in $(tar tf $BACKUP_TAR); do
-      [[ -e $f ]] && rm -f $f
+    # for f in $(tar tf $BACKUP_TAR); do
+    #   [[ -e $f ]] && rm -f $f
+    # done
+    tar tf $BACKUP_TAR | while IFS= read -r f; do
+      [[ -e "$f" ]] && rm -f -- "$f"
     done
     log_verbose "Removed existing tracked files"
   else
     log_verbose "No existing tracked files to back up."
   fi
-); }
+);}
 
 # ---- apply iterm2 configuration ------------------------------------
 
 apply_iterm2_config() {
   # readonly variables (constants)
-  local -r CONFIG_DIR="$HOME/.config/iterm2"
+  local -r ITERM2_CONFIG_DIR="$CONFIG_DIR/iterm2"
   local -r DOMAIN="com.googlecode.iterm2"
-  local -r PLIST="$CONFIG_DIR/$DOMAIN.plist"
-  local -r PLIST_XML="$CONFIG_DIR/$DOMAIN.plist.xml"
+  local -r PLIST="$ITERM2_CONFIG_DIR/$DOMAIN.plist"
+  local -r PLIST_XML="$ITERM2_CONFIG_DIR/$DOMAIN.plist.xml"
   local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
 
   # Ensure iTerm2 is installed
