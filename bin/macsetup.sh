@@ -62,9 +62,10 @@ trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s w
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/${MACSETUP}.git"
-readonly SCRATCH_DIR="$HOME/.scratch/${MACSETUP}"
+readonly BARE_REPO="$HOME/$MACSETUP.git"
 readonly CONFIG_DIR="$HOME/.config"
+readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"
+readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
 VERBOSE=false
 NO_COLOR=false
@@ -72,35 +73,27 @@ NO_COLOR=false
 # ---- colors (conditionally enabled) --------------------------------
 
 setup_colors() {
-  if [[ "$NO_COLOR" == true ]]; then
-    COLOR_INFO=""
-    COLOR_WARN=""
-    COLOR_ERROR=""
-    COLOR_VERBOSE=""
-    COLOR_RESET=""
-    return
-  fi
-  if [[ -t 1 ]] && command -v tput > /dev/null 2>&1; then
+  COLOR_INFO=""
+  COLOR_WARN=""
+  COLOR_ERROR=""
+  COLOR_VERBOSE=""
+  COLOR_RESET=""
+
+  if [[ "$NO_COLOR" != true ]] && [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
     COLOR_INFO=$(tput setaf 2)    # green
     COLOR_WARN=$(tput setaf 3)    # yellow
     COLOR_ERROR=$(tput setaf 1)   # red
     COLOR_VERBOSE=$(tput setaf 7) # white (high-contrast)
     COLOR_RESET=$(tput sgr0)
-  else
-    COLOR_INFO=""
-    COLOR_WARN=""
-    COLOR_ERROR=""
-    COLOR_VERBOSE=""
-    COLOR_RESET=""
   fi
 }
 
 # ---- logging helpers -----------------------------------------------
 
-log_info() { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
-log_warn() { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
-log_error() { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
-log_verbose() { if [[ "$VERBOSE" == true ]]; then printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*"; fi; }
+log_info()    { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
+log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
+log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
+log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
 # ---- usage / args ---------------------------------------------------
 
@@ -164,9 +157,8 @@ MSG
 
 ensure_homebrew() {
   if command -v brew > /dev/null 2>&1; then
-    log_verbose "Homebrew is already installed"
-    eval "$("$(brew --prefix)"/bin/brew shellenv)"
-    log_verbose "brew available at: $(command -v brew)"
+    log_verbose "Homebrew is already installed at: $(command -v brew)"
+    eval "$(brew shellenv)"
     return 0
   fi
 
@@ -174,8 +166,8 @@ ensure_homebrew() {
   curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash
 
   if command -v brew > /dev/null 2>&1; then
-    eval "$("$(brew --prefix)"/bin/brew shellenv)"
-    log_verbose "brew installed at: $(command -v brew)"
+    log_verbose "Homebrew installed at: $(command -v brew)"
+    eval "$(brew shellenv)"
   else
     local found=""
     for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
@@ -203,7 +195,8 @@ brew_install_packages() {
 
   [[ ! -f "$BREWFILE" ]] && log_error "$BREWFILE not found" && exit 1
 
-  if ! brew bundle --file="$BREWFILE"; then
+  brew bundle --file="$BREWFILE"
+  if [[ "$?" -ne 0 ]]; then
     log_error "brew bundle did not complete successfully."
     exit 3
   fi
@@ -240,12 +233,12 @@ backup_existing_config() {(
 
   local -r TRACKED_FILES="$SCRATCH_DIR/tracked-files.txt"
   local -r EXISTING_TRACKED_FILES="$SCRATCH_DIR/existing-tracked-files.txt"
-  local -r BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
   cd $HOME
 
   # List tracked files, excluding README* files
-  git --no-pager --git-dir=$BARE_REPO ls-tree --full-tree -r --name-only HEAD | grep -Ev '^README($|\.md$)' > $TRACKED_FILES
+  git --no-pager --git-dir=$BARE_REPO ls-tree --full-tree -r --name-only HEAD \
+    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > $TRACKED_FILES
 
   # List which of those tracked files already exist
   while IFS= read -r f; do
@@ -279,6 +272,8 @@ apply_iterm2_config() {
   local -r PLIST="$ITERM2_CONFIG_DIR/$DOMAIN.plist"
   local -r PLIST_XML="$ITERM2_CONFIG_DIR/$DOMAIN.plist.xml"
   local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
+
+  ensure_homebrew
 
   # Ensure iTerm2 is installed
   if ! brew list --cask iterm2 > /dev/null 2>&1; then
@@ -369,8 +364,8 @@ apply_iterm2_config() {
 
 # ---- placeholders for future steps ---------------------------------
 
-install_oh_my_zsh() { log_warn "install_oh_my_zsh() not implemented yet."; }
-chsh_to_zsh() { log_warn "chsh_to_zsh() not implemented yet."; }
+install_oh_my_zsh() { log_warn "install_oh_my_zsh() is not implemented yet."; }
+chsh_to_zsh() { log_warn "chsh_to_zsh() is not implemented yet."; }
 
 # ---- apply my configuration ----------------------------------------
 
@@ -379,52 +374,47 @@ apply_my_config() {
   git --git-dir="$BARE_REPO" --work-tree="$HOME" config --local status.showUntrackedFiles no
 
   # Check out dotfiles from the bare repo into $HOME
-  git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout
+  git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f
 
-  # Install packages and apps
-  brew_install_packages
-  install_oh_my_zsh
-
-  # Configure apps
-  apply_iterm2_config
-  chsh_to_zsh
+  if [[ "$?" -ne 0 ]]; then
+    log_error "Failed to checkout dotfiles from the bare repo into $HOME"
+    exit 1
+  else
+    brew_install_packages
+    install_oh_my_zsh
+    apply_iterm2_config
+    chsh_to_zsh
+  fi
 }
 
 # ---- wrap up --------------------------------------------------------
 
 wrap_up() {
-  cat << EOF
+  local summary details repo_commit repo_branch
 
+  summary="$(cat << EOF
 Done!
-
-Backups (if any) were written to:
-    ${BACKUP_TAR}
-
 Handy alias for working with your bare repo:
-    alias c='git --no-pager --git-dir=$BARE_REPO --work-tree=$HOME'
-    # Example: c status -s
-
+  alias c='git --no-pager --git-dir=$BARE_REPO --work-tree=$HOME'
+  Example: c status -s
 EOF
+)"
+  log_info "$summary"
 
   if [[ "$VERBOSE" == true ]]; then
-    if command -v brew > /dev/null 2>&1; then
-      BREW_PREFIX="$(brew --prefix 2> /dev/null || true)"
-    else
-      BREW_PREFIX=""
-    fi
-
     # Report the current local bare repo state to avoid referencing an undefined BRANCH var
-    REPO_COMMIT="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD 2> /dev/null || true)"
-    REPO_BRANCH="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD 2> /dev/null || echo DETACHED)"
+    repo_commit="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD 2> /dev/null || true)"
+    repo_branch="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD 2> /dev/null || echo DETACHED)"
+    details="$(cat <<EOF
 
-    cat << EOF
-[verbose]
-BARE REPO   : ${BARE_REPO}
-REPO COMMIT : ${REPO_COMMIT}
-REPO BRANCH : ${REPO_BRANCH}
-SCRATCH DIR : ${SCRATCH_DIR}
-BREW PREFIX : ${BREW_PREFIX}
+BARE REPO   : $BARE_REPO
+REPO COMMIT : $repo_commit
+REPO BRANCH : $repo_branch
+BREW PREFIX : $HOMEBREW_PREFIX
+BACKUP TAR  : $BACKUP_TAR
 EOF
+)"
+    log_verbose "$details"
   fi
 }
 
@@ -443,8 +433,11 @@ init() {
 #                       #
 #=======================#
 
-init "$@" # pass command line args; quotes preserve spaces and prevent glob expansion
-ensure_bare_repo
-backup_existing_config
-apply_my_config # all the heavy lifting to configure this Mac happens here
-wrap_up
+# Run only if script is *executed* directly, i.e. not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  init "$@"        # pass command line args to init(); quotes preserve spaces and prevent glob expansion
+  ensure_bare_repo
+  backup_existing_config
+  apply_my_config  # all the heavy lifting to configure this Mac happens here
+  wrap_up
+fi
