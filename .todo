@@ -1,0 +1,7 @@
+[ ] Generate a GH_TOKEN (GitHub Personal Access Token)
+[ ] Write bin/make-github-ssh-key.sh the does the following:
+    [ ] Generates a new ssh key
+    [ ] Adds the new ssh key to my github account
+    [ ] Confirms the new ssh key works
+
+k
