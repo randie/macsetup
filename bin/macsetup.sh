@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ====================================================================
+# ==============================================================================
 # macsetup.sh — Bootstrap a new macOS (Intel or Apple Silicon) machine
-# ====================================================================
+# ==============================================================================
 #
 # What this script does (step-by-step):
 #   1) init:
@@ -10,7 +10,7 @@
 #        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
 #        • mkdir -p          — ensure scratch directory exists
 #   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup-bare exists, clone if missing
+#        • make sure $HOME/macsetup.git exists, clone if missing
 #   3) backup_existing_config:
 #        • get list of TRACKED_FILES excluding README*
 #        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
@@ -47,7 +47,7 @@
 #   3  brew bundle failed
 #   64 usage error (unknown flag)
 #
-# ====================================================================
+# ==============================================================================
 
 # Fail-fast settings:
 #   -e  stop on the first error
@@ -57,7 +57,7 @@
 set -Eeuo pipefail
 trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s while running: %s (exit %s).\n" "${BASH_SOURCE[0]}" "${LINENO}" "${cmd}" "${rc}" >&2; exit "$rc"' ERR
 
-# ---- globals -------------------------------------------------------
+# ---------------------------------- globals -----------------------------------
 
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
@@ -70,7 +70,7 @@ readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 VERBOSE=false
 NO_COLOR=false
 
-# ---- colors (conditionally enabled) --------------------------------
+# ----------------------- colors (conditionally enabled) -----------------------
 
 setup_colors() {
   COLOR_INFO=""
@@ -88,14 +88,14 @@ setup_colors() {
   fi
 }
 
-# ---- logging helpers -----------------------------------------------
+# ------------------------------ logging helpers -------------------------------
 
 log_info()    { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
 log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
 log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
 log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
-# ---- usage / args ---------------------------------------------------
+# ----------------------------------- usage ------------------------------------
 
 usage() {
   cat << 'EOF'
@@ -107,6 +107,8 @@ Options:
   -h, --help      Show this help and exit
 EOF
 }
+
+# -------------------------------- args parsing --------------------------------
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -136,7 +138,7 @@ parse_args() {
   done
 }
 
-# ---- ensure Xcode Command Line Tools --------------------------------
+# ---------------------- ensure Xcode Command Line Tools -----------------------
 
 ensure_xcode_clt() {
   if ! xcode-select -p > /dev/null 2>&1; then
@@ -153,7 +155,7 @@ MSG
   log_verbose "Xcode Command Line Tools detected: $(xcode-select -p)"
 }
 
-# ---- ensure homebrew exists ----------------------------------------
+# --------------------------- ensure homebrew exists ---------------------------
 
 ensure_homebrew() {
   if command -v brew > /dev/null 2>&1; then
@@ -186,7 +188,7 @@ ensure_homebrew() {
   fi
 }
 
-# ---- brew install packages -----------------------------------------
+# --------------------------- brew install packages ----------------------------
 
 brew_install_packages() {
   local -r BREWFILE="$CONFIG_DIR/brew/Brewfile"
@@ -202,7 +204,7 @@ brew_install_packages() {
   fi
 }
 
-# ---- ensure bare repo exists ----------------------------------------
+# -------------------------- ensure bare repo exists ---------------------------
 
 ensure_bare_repo() {
     local commit branch
@@ -224,7 +226,7 @@ ensure_bare_repo() {
     fi
 }
 
-# ---- backup existing tracked files ----------------------------------
+# --------------------------- backup existing config ---------------------------
 
 backup_existing_config() {(
   # NOTE: The parens enclosing this function creates a subshell
@@ -263,7 +265,7 @@ backup_existing_config() {(
   fi
 );}
 
-# ---- apply iterm2 configuration ------------------------------------
+# ------------------------ apply my iterm2 configuration -----------------------
 
 apply_iterm2_config() {
   # readonly variables (constants)
@@ -362,12 +364,12 @@ apply_iterm2_config() {
   log_info "If iTerm2 is running, quit and relaunch to pick up changes."
 }
 
-# ---- placeholders for future steps ---------------------------------
+# ---------------------------- not implemented yet -----------------------------
 
 install_oh_my_zsh() { log_warn "install_oh_my_zsh() is not implemented yet."; }
 chsh_to_zsh() { log_warn "chsh_to_zsh() is not implemented yet."; }
 
-# ---- apply my configuration ----------------------------------------
+# --------------------------- apply my configuration ---------------------------
 
 apply_my_config() {
   # Hide untracked files in status
@@ -387,7 +389,7 @@ apply_my_config() {
   fi
 }
 
-# ---- wrap up --------------------------------------------------------
+# ---------------------------------- wrap up -----------------------------------
 
 wrap_up() {
   local summary details repo_commit repo_branch
@@ -418,7 +420,7 @@ EOF
   fi
 }
 
-# ---- init (single entry for early setup) ----------------------------
+# ---------------------------------- init --------------------------------------
 
 init() {
   parse_args "$@"
