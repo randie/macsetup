@@ -64,11 +64,64 @@ readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
 readonly BARE_REPO="$HOME/$MACSETUP.git"
 readonly CONFIG_DIR="$HOME/.config"
-readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"
+readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
+readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
 VERBOSE=false
 NO_COLOR=false
+
+# ------------------------------ logging helpers -------------------------------
+
+log_info()    { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
+log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
+log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
+log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
+
+# -------------------------- pre- and post-conditions --------------------------
+
+ensure_preconditions() {
+  local fail=0
+
+  # 1) macOS only
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    log_error "This script targets macOS machines only. Detected $(uname -s)."
+    return 1
+  fi
+
+  # 2) Apple Command Line Tools installed
+  if [[ ! -x /usr/bin/xcode-select ]] || ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
+    log_error $'Apple Command Line Tools are required.\nInstall: xcode-select --install'
+    fail=1
+  fi
+
+  # 3) Tools needed by Homebrew are available
+  local -a required_tools=(git curl)
+  local -a missing_tools=()
+  local t
+  for t in "${required_tools[@]}"; do
+    command -v "$t" >/dev/null 2>&1 || missing_tools+=("$t")
+  done
+  if ((${#missing_tools[@]})); then
+    log_error "Missing tools: ${missing_tools[*]}"
+    fail=1
+  fi
+
+  # 4) HOME directory is writable
+  if [[ ! -w "$HOME" ]]; then
+    log_error "\$HOME ($HOME) is not writable"
+    fail=1
+  fi
+
+  if ((fail)); then
+    log_error "Preconditions are not met. Fix the above and re-run."
+    exit 1
+  fi
+}
+
+ensure_postconditions() {
+  : # TODO: implement
+}
 
 # ----------------------- colors (conditionally enabled) -----------------------
 
@@ -87,13 +140,6 @@ setup_colors() {
     COLOR_RESET=$(tput sgr0)
   fi
 }
-
-# ------------------------------ logging helpers -------------------------------
-
-log_info()    { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
-log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
-log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
-log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
 # ----------------------------------- usage ------------------------------------
 
@@ -140,20 +186,20 @@ parse_args() {
 
 # ---------------------- ensure Xcode Command Line Tools -----------------------
 
-ensure_xcode_clt() {
-  if ! xcode-select -p > /dev/null 2>&1; then
-    log_error "Xcode Command Line Tools not found."
-    cat << 'MSG' >&2
-
-Please install them manually by running:
-    xcode-select --install
-
-Then re-run this script.
-MSG
-    exit 1
-  fi
-  log_verbose "Xcode Command Line Tools detected: $(xcode-select -p)"
-}
+# ensure_xcode_clt() {
+#   if ! xcode-select -p > /dev/null 2>&1; then
+#     log_error "Xcode Command Line Tools not found."
+#     cat << 'MSG' >&2
+#
+# Please install them manually by running:
+#     xcode-select --install
+#
+# Then re-run this script.
+# MSG
+#     exit 1
+#   fi
+#   log_verbose "Xcode Command Line Tools detected: $(xcode-select -p)"
+# }
 
 # --------------------------- ensure homebrew exists ---------------------------
 
@@ -191,18 +237,16 @@ ensure_homebrew() {
 # --------------------------- brew install packages ----------------------------
 
 brew_install_packages() {
-  local -r BREWFILE="$CONFIG_DIR/brew/Brewfile"
-
-  ensure_homebrew
-
-  [[ ! -f "$BREWFILE" ]] && log_error "$BREWFILE not found" && exit 1
-
-  brew bundle --file="$BREWFILE"
-  if [[ "$?" -ne 0 ]]; then
+  if [[ ! -r "$BREWFILE" ]]; then
+    log_error "Brewfile not found or unreadable: $BREWFILE"
+    exit 3
+  fi
+  if ! brew bundle --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
     exit 3
   fi
 }
+
 
 # -------------------------- ensure bare repo exists ---------------------------
 
@@ -236,27 +280,27 @@ backup_existing_config() {(
   local -r TRACKED_FILES="$SCRATCH_DIR/tracked-files.txt"
   local -r EXISTING_TRACKED_FILES="$SCRATCH_DIR/existing-tracked-files.txt"
 
-  cd $HOME
+  cd "$HOME"
 
   # List tracked files, excluding README* files
-  git --no-pager --git-dir=$BARE_REPO ls-tree --full-tree -r --name-only HEAD \
-    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > $TRACKED_FILES
+  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
+    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
 
   # List which of those tracked files already exist
   while IFS= read -r f; do
     [ -e "$f" ] && echo "$f"
-  done < $TRACKED_FILES > $EXISTING_TRACKED_FILES
+  done < "$TRACKED_FILES" > "$EXISTING_TRACKED_FILES"
 
-  if [[ -s $EXISTING_TRACKED_FILES ]]; then
+  if [[ -s "$EXISTING_TRACKED_FILES" ]]; then
     # Create a backup tarball rooted at $HOME (entries are relative paths)
-    tar cf $BACKUP_TAR -T $EXISTING_TRACKED_FILES
+    tar cf "$BACKUP_TAR" -T "$EXISTING_TRACKED_FILES"
     log_verbose "Created backup: $BACKUP_TAR"
 
     # Remove existing tracked files that were backed up to $BACKUP_TAR
     # for f in $(tar tf $BACKUP_TAR); do
     #   [[ -e $f ]] && rm -f $f
     # done
-    tar tf $BACKUP_TAR | while IFS= read -r f; do
+    tar tf "$BACKUP_TAR" | while IFS= read -r f; do
       [[ -e "$f" ]] && rm -f -- "$f"
     done
     log_verbose "Removed existing tracked files"
@@ -269,13 +313,11 @@ backup_existing_config() {(
 
 apply_iterm2_config() {
   # readonly variables (constants)
-  local -r ITERM2_CONFIG_DIR="$CONFIG_DIR/iterm2"
+  local -r ITERM2_CONFIG_DIR="$CONFIG_DIR/iterm2"; mkdir -p "$ITERM2_CONFIG_DIR"
   local -r DOMAIN="com.googlecode.iterm2"
   local -r PLIST="$ITERM2_CONFIG_DIR/$DOMAIN.plist"
   local -r PLIST_XML="$ITERM2_CONFIG_DIR/$DOMAIN.plist.xml"
   local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
-
-  ensure_homebrew
 
   # Ensure iTerm2 is installed
   if ! brew list --cask iterm2 > /dev/null 2>&1; then
@@ -285,9 +327,6 @@ apply_iterm2_config() {
     log_verbose "iTerm2 already installed"
   fi
 
-  # Ensure CONFIG_DIR exists
-  mkdir -p "$CONFIG_DIR"
-
   # Pick a source plist in priority order
   local plist_src=""
   if [[ -f "$PLIST" ]]; then
@@ -295,7 +334,7 @@ apply_iterm2_config() {
   elif [[ -f "$PLIST_XML" ]]; then
     plist_src="$PLIST_XML"
   elif [[ -f "$SYS_PLIST" ]]; then
-    log_warn "No $DOMAIN plist in $CONFIG_DIR. Falling back to $SYS_PLIST."
+    log_warn "No $DOMAIN plist in $ITERM2_CONFIG_DIR. Falling back to $SYS_PLIST."
     plist_src="$SYS_PLIST"
   else
     log_warn "No existing $DOMAIN settings found. iTerm2 will start with defaults."
@@ -349,8 +388,8 @@ apply_iterm2_config() {
     # cp -f "$plist_src" "$SYS_PLIST" 2>/dev/null || true
   fi
 
-  # Point iTerm2 at CONFIG_DIR for load/save of iterm2 settings
-  defaults write "$DOMAIN" PrefsCustomFolder -string "$CONFIG_DIR"
+  # Point iTerm2 at ITERM2_CONFIG_DIR for load/save of iterm2 settings
+  defaults write "$DOMAIN" PrefsCustomFolder -string "$ITERM2_CONFIG_DIR"
   defaults write "$DOMAIN" LoadPrefsFromCustomFolder -bool true
 
   # Suppress the nag dialog about custom prefs not syncing
@@ -359,7 +398,7 @@ apply_iterm2_config() {
   # Flush settings cache
   killall -u "$USER" cfprefsd > /dev/null 2>&1 || true
 
-  log_info "iTerm2 is set to load & save settings from: $CONFIG_DIR"
+  log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
   log_info "Tracked XML plist updated (if possible): $PLIST_XML"
   log_info "If iTerm2 is running, quit and relaunch to pick up changes."
 }
@@ -376,22 +415,20 @@ apply_my_config() {
   git --git-dir="$BARE_REPO" --work-tree="$HOME" config --local status.showUntrackedFiles no
 
   # Check out dotfiles from the bare repo into $HOME
-  git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f
-
-  if [[ "$?" -ne 0 ]]; then
-    log_error "Failed to checkout dotfiles from the bare repo into $HOME"
-    exit 1
-  else
+  if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
     brew_install_packages
-    install_oh_my_zsh
+    # install_oh_my_zsh    # TODO: switch to antidote
     apply_iterm2_config
     chsh_to_zsh
+  else
+    log_error "Failed to checkout dotfiles from the bare repo into $HOME"
+    exit 1
   fi
 }
 
 # ---------------------------------- wrap up -----------------------------------
 
-wrap_up() {
+wrap_up_message() {
   local summary details repo_commit repo_branch
 
   summary="$(cat << EOF
@@ -420,13 +457,20 @@ EOF
   fi
 }
 
-# ---------------------------------- init --------------------------------------
+# ---------------------------- pre- and post-flight ----------------------------
 
-init() {
+pre_flight() {
   parse_args "$@"
   setup_colors
-  ensure_xcode_clt
-  mkdir -p "$SCRATCH_DIR"
+  ensure_preconditions
+  ensure_bare_repo
+  ensure_homebrew
+  backup_existing_config
+}
+
+post_flight() {
+  ensure_postconditions
+  wrap_up_message
 }
 
 #=======================#
@@ -437,9 +481,7 @@ init() {
 
 # Run only if script is *executed* directly, i.e. not sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  init "$@"        # pass command line args to init(); quotes preserve spaces and prevent glob expansion
-  ensure_bare_repo
-  backup_existing_config
-  apply_my_config  # all the heavy lifting to configure this Mac happens here
-  wrap_up
+  pre_flight "$@"
+  apply_my_config    # all the heavy lifting to configure this Mac happens here
+  post_flight
 fi
