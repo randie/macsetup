@@ -10,7 +10,7 @@
 #        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
 #        • mkdir -p          — ensure scratch directory exists
 #   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup.git exists, clone if missing
+#        • make sure $HOME/macsetup-bare exists
 #   3) backup_existing_config:
 #        • get list of TRACKED_FILES excluding README*
 #        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
@@ -62,10 +62,10 @@ trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s w
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/$MACSETUP.git"
+readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
-readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"; mkdir -p "$SCRATCH_DIR"
+readonly SCRATCH_DIR="$HOME/$MACSETUP-scratch"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
 VERBOSE=false
@@ -247,6 +247,16 @@ brew_install_packages() {
   fi
 }
 
+# ---------------------------- antidote prebundle ------------------------------
+
+# antidote_prebundle() {
+#   local _plugins_txt="$CONFIG_DIR/zsh/.zsh_plugins.txt"
+#   local _plugins_zsh="$CACHE_DIR/zsh/.zsh_plugins.zsh"
+#   [[ -r "$_plugins_txt" ]] || return 0
+#   source "$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" || return 0
+#   mkdir -p "$(dirname "$_plugins_zsh")"
+#   antidote bundle < "$_plugins_txt" > "$_plugins_zsh"
+# }   
 
 # -------------------------- ensure bare repo exists ---------------------------
 
@@ -254,13 +264,16 @@ ensure_bare_repo() {
     local commit branch
 
     if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
-      # If you're running this script, then you should already have
-      # a bare repo in $HOME/macsetup.git since this script would
-      # have been checked out from that bare repo.
-      log_verbose "Bare repo already exists"
+      log_verbose "Bare repo exists @ $BARE_REPO"
     else
-      log_info "Cloning bare repo"
-      git clone --bare "$GITHUB_REPO" "$BARE_REPO"
+      # log_info "Cloning bare repo"
+      # git clone --bare "$GITHUB_REPO" "$BARE_REPO"
+
+      # If you're running this script, then a bare repo should already exist
+      # in $HOME/macsetup-bare since this script would have been checked out
+      # from that bare repo (if instructions in README.md were followed).
+      log_error "Bare repo does not exist @ $BARE_REPO"
+      exit 1
     fi
 
     if [[ "$VERBOSE" == true ]]; then
@@ -417,7 +430,7 @@ apply_my_config() {
   # Check out dotfiles from the bare repo into $HOME
   if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
     brew_install_packages
-    # install_oh_my_zsh    # TODO: switch to antidote
+    # antidote_prebundle
     apply_iterm2_config
     chsh_to_zsh
   else

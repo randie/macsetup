@@ -1,0 +1,20 @@
+#-----------------------------
+# Antidote's zsh plugins file
+#-----------------------------
+
+# oh-my-zsh integration helpers (recommended by Antidote maintainer)
+getantidote/use-omz
+
+# Powerlevel10k theme (load early so it's ready before .p10k.zsh is sourced)
+romkatv/powerlevel10k
+
+# plugins that live in the oh-my-zsh repo
+ohmyzsh/ohmyzsh path:plugins/git
+ohmyzsh/ohmyzsh path:plugins/direnv
+ohmyzsh/ohmyzsh path:plugins/autojump
+ohmyzsh/ohmyzsh path:plugins/vi-mode
+
+# zsh-users plugins
+zsh-users/zsh-autosuggestions
+zsh-users/zsh-history-substring-search
+zsh-users/zsh-syntax-highlighting  # NOTE: must be listed last
