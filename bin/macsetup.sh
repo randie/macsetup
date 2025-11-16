@@ -49,6 +49,7 @@
 #
 # ==============================================================================
 
+
 # Fail-fast settings:
 #   -e  stop on the first error
 #   -u  error on unset variables
@@ -183,23 +184,6 @@ parse_args() {
     esac
   done
 }
-
-# ---------------------- ensure Xcode Command Line Tools -----------------------
-
-# ensure_xcode_clt() {
-#   if ! xcode-select -p > /dev/null 2>&1; then
-#     log_error "Xcode Command Line Tools not found."
-#     cat << 'MSG' >&2
-#
-# Please install them manually by running:
-#     xcode-select --install
-#
-# Then re-run this script.
-# MSG
-#     exit 1
-#   fi
-#   log_verbose "Xcode Command Line Tools detected: $(xcode-select -p)"
-# }
 
 # --------------------------- ensure homebrew exists ---------------------------
 
