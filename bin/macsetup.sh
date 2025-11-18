@@ -44,21 +44,37 @@
 # Exit codes (convention):
 #   0  success
 #   1  generic failure
-#   3  brew bundle failed
-#   64 usage error (unknown flag)
+#   3  brew bundle failed - Brewfile not found or unreadable
+#   4  brew bundle failed - brew bundle did not complete successfully
+#  64  usage error (unknown flag)
 #
 # ==============================================================================
 
 
 # Fail-fast settings:
+#   -E  ensure ERR traps propagate in functions/subshells
 #   -e  stop on the first error
 #   -u  error on unset variables
 #   -o  pipefail  catch errors in pipelines
-#   -E  ensure ERR traps propagate in functions/subshells
 set -Eeuo pipefail
+
+# This trap is executed when any command in the script fails;
+# it provides a more detailed error message with the file name,
+# line number, failed command, and exit code.
 trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s while running: %s (exit %s).\n" "${BASH_SOURCE[0]}" "${LINENO}" "${cmd}" "${rc}" >&2; exit "$rc"' ERR
 
 # ---------------------------------- globals -----------------------------------
+
+# Setting these color defaults here so logging works even before setup_colors is called,
+# i.e. avoids "unbound variable" errors when logging before setup_colors is called.
+COLOR_INFO=""
+COLOR_WARN=""
+COLOR_ERROR=""
+COLOR_VERBOSE=""
+COLOR_RESET=""
+NO_COLOR=false
+
+VERBOSE=false
 
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
@@ -68,9 +84,6 @@ readonly CONFIG_DIR="$HOME/.config"
 readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
 readonly SCRATCH_DIR="$HOME/$MACSETUP-scratch"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
-
-VERBOSE=false
-NO_COLOR=false
 
 # ------------------------------ logging helpers -------------------------------
 
@@ -82,13 +95,13 @@ log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s
 # -------------------------- pre- and post-conditions --------------------------
 
 ensure_preconditions() {
-  local fail=0
-
-  # 1) macOS only
+  # 1) Running on macOS
   if [[ "$(uname -s)" != "Darwin" ]]; then
     log_error "This script targets macOS machines only. Detected $(uname -s)."
-    return 1
+    exit 1
   fi
+
+  local fail=0
 
   # 2) Apple Command Line Tools installed
   if [[ ! -x /usr/bin/xcode-select ]] || ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
@@ -127,12 +140,10 @@ ensure_postconditions() {
 # ----------------------- colors (conditionally enabled) -----------------------
 
 setup_colors() {
-  COLOR_INFO=""
-  COLOR_WARN=""
-  COLOR_ERROR=""
-  COLOR_VERBOSE=""
-  COLOR_RESET=""
-
+  # Conditionally enable colors if:
+  # - NO_COLOR is not true (i.e. --no-color flag not passed)
+  # - stdout is a TTY (i.e. not redirected to a file)
+  # - tput is available (i.e. a terminal is connected)
   if [[ "$NO_COLOR" != true ]] && [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
     COLOR_INFO=$(tput setaf 2)    # green
     COLOR_WARN=$(tput setaf 3)    # yellow
@@ -194,27 +205,29 @@ ensure_homebrew() {
     return 0
   fi
 
-  log_verbose "Installing Homebrew"
-  curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash
-
-  if command -v brew > /dev/null 2>&1; then
-    log_verbose "Homebrew installed at: $(command -v brew)"
-    eval "$(brew shellenv)"
-  else
-    local found=""
-    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-      if [[ -x "$b" ]]; then
-        eval "$($b shellenv)"
-        found="$b"
-        break
-      fi
-    done
-    if [[ -z "$found" ]]; then
-      log_error "Homebrew installed but brew command not found in PATH or in standard locations."
-      exit 1
+  if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
+    if command -v brew > /dev/null 2>&1; then
+      log_verbose "Homebrew installed successfully at: $(command -v brew)"
+      eval "$(brew shellenv)"
     else
-      log_verbose "brew found at: $found"
+      local found=""
+      for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -x "$b" ]]; then
+          eval "$($b shellenv)"
+          found="$b"
+          break
+        fi
+      done
+      if [[ -z "$found" ]]; then
+        log_error "Homebrew installed but brew command not found in PATH or in standard locations."
+        exit 1
+      else
+        log_verbose "brew found at: $found"
+      fi
     fi
+  else
+    log_error "Homebrew installation failed"
+    exit 1
   fi
 }
 
@@ -227,20 +240,9 @@ brew_install_packages() {
   fi
   if ! brew bundle --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
-    exit 3
+    exit 4
   fi
 }
-
-# ---------------------------- antidote prebundle ------------------------------
-
-# antidote_prebundle() {
-#   local _plugins_txt="$CONFIG_DIR/zsh/.zsh_plugins.txt"
-#   local _plugins_zsh="$CACHE_DIR/zsh/.zsh_plugins.zsh"
-#   [[ -r "$_plugins_txt" ]] || return 0
-#   source "$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" || return 0
-#   mkdir -p "$(dirname "$_plugins_zsh")"
-#   antidote bundle < "$_plugins_txt" > "$_plugins_zsh"
-# }   
 
 # -------------------------- ensure bare repo exists ---------------------------
 
@@ -400,10 +402,48 @@ apply_iterm2_config() {
   log_info "If iTerm2 is running, quit and relaunch to pick up changes."
 }
 
-# ---------------------------- not implemented yet -----------------------------
+# ------------------------- change login shell to zsh --------------------------
 
-install_oh_my_zsh() { log_warn "install_oh_my_zsh() is not implemented yet."; }
-chsh_to_zsh() { log_warn "chsh_to_zsh() is not implemented yet."; }
+chsh_to_zsh() {
+  local brew_prefix=""
+  local zsh_path=""
+  local current_shell=""
+  local dscl_output=""
+
+  # Determine Homebrew-installed zsh
+  brew_prefix="$(brew --prefix 2>/dev/null || true)"
+  zsh_path="${brew_prefix}/bin/zsh"
+
+  if [[ -z "$brew_prefix" || ! -x "$zsh_path" ]]; then
+    log_error "Homebrew-installed zsh not found at: $zsh_path"
+    return 1
+  fi
+
+  # Determine the user's actual login shell via Directory Services
+  dscl_output="$(dscl . -read "/Users/$USER" UserShell 2>/dev/null)"
+  current_shell="$(awk 'NF==2 {print $2}' <<< "$dscl_output")"
+
+  # Already Homebrew zsh? Nothing to do.
+  if [[ "$current_shell" == "$zsh_path" ]]; then
+    log_verbose "Login shell is already Homebrew zsh: $current_shell"
+    return 0
+  fi
+
+  # If Homebrew zsh is NOT in /etc/shells, tell the user how to add it.
+  if ! grep -qx "$zsh_path" /etc/shells 2>/dev/null; then
+    log_warn <<EOF
+Homebrew zsh ($zsh_path) is not listed in /etc/shells.
+To allow it as a login shell, run:
+  echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+EOF
+  fi
+
+  # One clean "chsh" message, outside the if
+  log_info <<EOF
+To change your login shell to Homebrew zsh, run:
+  chsh -s "$zsh_path"
+EOF
+}
 
 # --------------------------- apply my configuration ---------------------------
 
@@ -414,7 +454,6 @@ apply_my_config() {
   # Check out dotfiles from the bare repo into $HOME
   if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
     brew_install_packages
-    # antidote_prebundle
     apply_iterm2_config
     chsh_to_zsh
   else
@@ -446,7 +485,7 @@ EOF
 BARE REPO   : $BARE_REPO
 REPO COMMIT : $repo_commit
 REPO BRANCH : $repo_branch
-BREW PREFIX : $HOMEBREW_PREFIX
+BREW PREFIX : $(brew --prefix)
 BACKUP TAR  : $BACKUP_TAR
 EOF
 )"
