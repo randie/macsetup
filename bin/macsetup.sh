@@ -75,6 +75,7 @@ COLOR_RESET=""
 NO_COLOR=false
 
 VERBOSE=false
+MANUAL_ACTIONS=()
 
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
@@ -92,6 +93,20 @@ log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
 log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
 log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
+# --------------------------- manual actions helpers ---------------------------
+
+add_manual_action() { MANUAL_ACTIONS+=("$1"); }
+
+print_manual_actions_summary() {
+  if ((${#MANUAL_ACTIONS[@]})); then
+    log_warn "Manual follow-up actions required:"
+    local action
+    for action in "${MANUAL_ACTIONS[@]}"; do
+      printf "  - %s\n" "$action"
+    done
+  fi
+}
+
 # -------------------------- pre- and post-conditions --------------------------
 
 ensure_preconditions() {
@@ -103,9 +118,9 @@ ensure_preconditions() {
 
   local fail=0
 
-  # 2) Apple Command Line Tools installed
+  # 2) Xcode Command Line Tools installed
   if [[ ! -x /usr/bin/xcode-select ]] || ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
-    log_error $'Apple Command Line Tools are required.\nInstall: xcode-select --install'
+    log_error $'Xcode Command Line Tools are required.\nInstall: xcode-select --install'
     fail=1
   fi
 
@@ -399,7 +414,7 @@ apply_iterm2_config() {
 
   log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
   log_info "Tracked XML plist updated (if possible): $PLIST_XML"
-  log_info "If iTerm2 is running, quit and relaunch to pick up changes."
+  add_manual_action "If iTerm2 is running, quit and relaunch it to apply the new iTerm2 settings."
 }
 
 # ------------------------- change login shell to zsh --------------------------
@@ -431,18 +446,11 @@ chsh_to_zsh() {
 
   # If Homebrew zsh is NOT in /etc/shells, tell the user how to add it.
   if ! grep -qx "$zsh_path" /etc/shells 2>/dev/null; then
-    log_warn <<EOF
-Homebrew zsh ($zsh_path) is not listed in /etc/shells.
-To allow it as a login shell, run:
-  echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
-EOF
+    add_manual_action "Add Homebrew zsh ($zsh_path) to /etc/shells: echo \"$zsh_path\" | sudo tee -a /etc/shells >/dev/null"
   fi
 
   # One clean "chsh" message, outside the if
-  log_info <<EOF
-To change your login shell to Homebrew zsh, run:
-  chsh -s "$zsh_path"
-EOF
+  add_manual_action "Change your login shell to Homebrew zsh: chsh -s \"$zsh_path\""
 }
 
 # --------------------------- apply my configuration ---------------------------
@@ -507,6 +515,7 @@ pre_flight() {
 post_flight() {
   ensure_postconditions
   wrap_up_message
+  print_manual_actions_summary
 }
 
 #=======================#
