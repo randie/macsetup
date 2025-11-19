@@ -14,10 +14,20 @@ set -o allexport
 case "$(uname -m)" in
   arm64)  brew_path="/opt/homebrew"                ;;  # Apple Silicon
   x86_64) brew_path="/usr/local"                   ;;  # Intel macOS
-  *)      if command -v brew >/dev/null 2>&1; then brew_path="$(brew --prefix 2>/dev/null)"; else brew_path=""; fi ;;  # fallback
+  *)
+    if command -v brew >/dev/null 2>&1; then
+      brew_path="$(brew --prefix 2>/dev/null)"
+      _zshinit_log "Non-standard architecture $(uname -m); using brew --prefix: $brew_path"
+    else
+      brew_path=""
+      _zshinit_log "brew not found on PATH for arch $(uname -m); skipping brew shellenv."
+    fi
+    ;;  # fallback
 esac
 if [[ -x "$brew_path/bin/brew" ]]; then
   eval "$("$brew_path/bin/brew" shellenv)"
+else
+  _zshinit_log "$brew_path/bin/brew is not executable; skipping brew shellenv."
 fi
 unset brew_path
 

@@ -60,19 +60,35 @@ autoload -Uz $ZFUNCDIR/*(.N:t)
 # direnv (directory-local env)
 if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook zsh)"
+else
+  _zshinit_log "direnv not found; directory-local environment hooks will not be active."
 fi
 
 # VS Code shell integration (only inside VS Code terminal)
-if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then
-  _vscode_zsh_integration="$(code --locate-shell-integration-path zsh 2>/dev/null)"
-  [[ -r "$_vscode_zsh_integration" ]] && source "$_vscode_zsh_integration"
-  unset _vscode_zsh_integration
+if [[ "$TERM_PROGRAM" == "vscode" ]]; then
+  if command -v code >/dev/null 2>&1; then
+    _vscode_zsh_integration="$(code --locate-shell-integration-path zsh 2>/dev/null)"
+    if [[ -r "$_vscode_zsh_integration" ]]; then
+      source "$_vscode_zsh_integration"
+    else
+      _zshinit_log "VS Code zsh integration file not readable: '$_vscode_zsh_integration'."
+    fi
+    unset _vscode_zsh_integration
+  else
+    _zshinit_log "code not found; VS Code shell integration will not be active."
+  fi
 fi
 
 # ------------------------------ Antidote ---------------------------------
 
 # FYI: HOMEBREW_PREFIX is set in .zprofile (which runs before .zshrc)
-source "$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh"
+_antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
+if [[ -r "$_antidote_zsh" ]]; then
+  source "$_antidote_zsh"
+else
+  _zshinit_log "Antidote script not readable at '$_antidote_zsh'."
+fi
+unset _antidote_zsh
 
 typeset -gA _antidote_paths
 _antidote_paths[txt]="$XDG_CONFIG_HOME/zsh/.zsh_plugins.txt"
@@ -84,12 +100,19 @@ if [[ ! -r "${_antidote_paths[zsh]}" || "${_antidote_paths[txt]}" -nt "${_antido
   antidote bundle < "${_antidote_paths[txt]}" > "${_antidote_paths[zsh]}"
 fi
 
-source "${_antidote_paths[zsh]}"
+if [[ -r "${_antidote_paths[zsh]}" ]]; then
+  if ! source "${_antidote_paths[zsh]}"; then
+    _zshinit_log "Sourcing Antidote bundle '${_antidote_paths[zsh]}' failed; zsh plugins may not be loaded."
+  fi
+else
+  _zshinit_log "Antidote bundle not readable at '${_antidote_paths[zsh]}'; zsh plugins not loaded."
+fi
 
 # Initialize completions *after* plugins adjust $fpath
-autoload -Uz compinit && compinit -u
+autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
+compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
 
-# plugin zsh-history-substring-search key bindings
+# plugin zsh-history-substring-search key bindings)
 # up/down arrows
 bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
