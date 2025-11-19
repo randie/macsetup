@@ -12,11 +12,6 @@
 # [y/n] confirmations, etc.) should go above this block; everything else
 # goes below.
 
-# Enable Powerlevel10k's instant prompt. Silence warnings about writing to
-# stdout/stderr during .zshrc to keep startup fast/clean. Messages must be
-# deferred (e.g. via precmd) or logged to avoid garbling the prompt
-typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
-
 # Use XDG cache for P10K’s instant prompt
 if [[ -r "$XDG_CACHE_HOME/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "$XDG_CACHE_HOME/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -29,28 +24,6 @@ fi
 # Lower values make vi-mode ESC feel snappier.
 # Higher values give you more time to type ESC-prefixed combos.
 typeset -g KEYTIMEOUT=5
-
-
-# ---------------------------------- Homebrew ----------------------------------
-
-# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installations,
-# and is set in .zprofile (by running `brew shellenv`).
-
-# # Homebrew command-not-found integration
-# _handler_sh="$HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh"
-# if [[ -n $HOMEBREW_PREFIX && -r $_handler_sh ]]; then
-#   source "$_handler_sh"
-
-#   # Silence auto-update during command-not-found suggestions
-#   if typeset -f command_not_found_handler >/dev/null; then
-#     functions -c command_not_found_handler _handler_copy
-#     command_not_found_handler() {
-#       HOMEBREW_NO_AUTO_UPDATE=1 _handler_copy "$@"
-#     }
-#     unset _handler_copy
-#   fi
-# fi
-# unset _handler_sh
 
 # ------------------------------- History options ------------------------------
 
@@ -79,7 +52,6 @@ setopt EXTENDED_GLOB               # enable advanced globbing operators
 
 # Autoload functions in $XDG_CONFIG_HOME/zsh/functions
 typeset -g ZFUNCDIR="$XDG_CONFIG_HOME/zsh/functions"
-mkdir -p $ZFUNCDIR
 typeset -gU fpath=("$ZFUNCDIR" $fpath)
 autoload -Uz $ZFUNCDIR/*(.N:t)
 
@@ -97,41 +69,9 @@ if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then
   unset _vscode_zsh_integration
 fi
 
-# # Activate autojump plugin
-# if [[ -n $HOMEBREW_PREFIX ]]; then
-#   _autojump_sh="$HOMEBREW_PREFIX/etc/profile.d/autojump.sh"
-#   [[ -r "$_autojump_sh" ]] && source "$_autojump_sh"
-#   unset _autojump_sh
-# fi
-
-# --------------------------------- Oh My Zsh ----------------------------------
-
-# typeset -g ZSH="$HOME/.oh-my-zsh"
-# typeset -g ZSH_THEME="powerlevel10k/powerlevel10k"
-
-# # Keep 'zsh-syntax-highlighting' LAST per its docs; include 'vi-mode'
-# # TODO: add 'autojump' back?
-# plugins=(
-#   git
-#   direnv
-#   vi-mode
-#   zsh-autosuggestions
-#   zsh-syntax-highlighting
-# )
-
-# # Load Oh My Zsh (silent if missing)
-# [[ -r "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
-
-# # If OMZ is absent (e.g., fresh machine), ensure completion still works
-# if [[ ! -r "$ZSH/oh-my-zsh.sh" ]]; then
-#   autoload -Uz compinit && compinit -u
-# fi
-
 # ------------------------------ Antidote ---------------------------------
 
-# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installations,
-# and is set in .zprofile.
-
+# FYI: HOMEBREW_PREFIX is set in .zprofile (which runs before .zshrc)
 source "$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh"
 
 typeset -gA _antidote_paths
@@ -149,16 +89,16 @@ source "${_antidote_paths[zsh]}"
 # Initialize completions *after* plugins adjust $fpath
 autoload -Uz compinit && compinit -u
 
-# History Substring Search keybindings
-# Up/Down arrows
+# plugin zsh-history-substring-search key bindings
+# up/down arrows
 bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
-# Emacs-style bindings
-bindkey -M emacs '^P' history-substring-search-up
-bindkey -M emacs '^N' history-substring-search-down
-# Vi normal mode bindings (j/k)
+# vi normal mode bindings (j/k)
 bindkey -M vicmd 'k' history-substring-search-up
 bindkey -M vicmd 'j' history-substring-search-down
+# # emacs-style bindings
+# bindkey -M emacs '^P' history-substring-search-up
+# bindkey -M emacs '^N' history-substring-search-down
 
 # ---------------------------------- Aliases -----------------------------------
 
@@ -201,7 +141,6 @@ alias cls='c ls-tree --full-tree -r --name-only HEAD'
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
 # To customize prompt, run `p10k configure` or edit ~/.config/zsh/p10k/.p10k.zsh
-# [[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
 _p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh" 
 [[ -f "$_p10k_zsh" ]] && source "$_p10k_zsh"
 unset _p10k_zsh

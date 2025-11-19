@@ -14,14 +14,18 @@ set -o allexport
 case "$(uname -m)" in
   arm64)  brew_path="/opt/homebrew"                ;;  # Apple Silicon
   x86_64) brew_path="/usr/local"                   ;;  # Intel macOS
-  *)      brew_path="$(brew --prefix 2>/dev/null)" ;;  # fallback
+  *)      if command -v brew >/dev/null 2>&1; then brew_path="$(brew --prefix 2>/dev/null)"; else brew_path=""; fi ;;  # fallback
 esac
 if [[ -x "$brew_path/bin/brew" ]]; then
   eval "$("$brew_path/bin/brew" shellenv)"
 fi
 unset brew_path
 
-PATH="$PATH:$HOME/bin"
+# Append $HOME/bin to $PATH if not already present
+case ":$PATH:" in
+  *":$HOME/bin:"*) ;;            # already present → do nothing
+  *) PATH="$PATH:$HOME/bin" ;;   # append safely
+esac
 
 if [[ -n "$SSH_CONNECTION" ]]; then
   EDITOR="vim"

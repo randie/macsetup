@@ -49,10 +49,11 @@
     status                  # exit code of the last command
     command_execution_time  # duration of the last command
     background_jobs         # presence of background jobs
+    my_zshinit_errors       # zshinit init error indicator
     direnv                  # direnv status (https://direnv.net/)
     asdf                    # asdf version manager (https://github.com/asdf-vm/asdf)
     # virtualenv            # python virtual environment (https://docs.python.org/3/library/venv.html)
-    my_venv_icon            # custom venv icon
+    my_python_venv          # custom python venv icon
     anaconda                # conda environment (https://conda.io/)
     pyenv                   # python environment (https://github.com/pyenv/pyenv)
     goenv                   # go environment (https://github.com/syndbg/goenv)
@@ -560,10 +561,11 @@
   # typeset -g POWERLEVEL9K_BACKGROUND_JOBS_VISUAL_IDENTIFIER_EXPANSION='⭐'
 
   #######################[ direnv: direnv status (https://direnv.net/) ]########################
-  # Direnv color.
+
+  # Direnv foreground color
   typeset -g POWERLEVEL9K_DIRENV_FOREGROUND=178
-  # Custom icon.
-  # typeset -g POWERLEVEL9K_DIRENV_VISUAL_IDENTIFIER_EXPANSION='⭐'
+  # Direnv visual identifier (yellow circle icon)
+  typeset -g POWERLEVEL9K_DIRENV_VISUAL_IDENTIFIER_EXPANSION='●'
 
   ###############[ asdf: asdf version manager (https://github.com/asdf-vm/asdf) ]###############
   # Default asdf color. Only used to display tools for which there is no color override (see below).
@@ -1656,6 +1658,11 @@ typeset -g POWERLEVEL9K_CONFIG_FILE=${${(%):-%x}:a}
 # Customize prompt segments
 #---------------------------
 
-function prompt_my_venv_icon() {
-  [[ -n $VIRTUAL_ENV ]] && p10k segment -i '▼' -f 34
+function prompt_my_python_venv() {
+  [[ -n $VIRTUAL_ENV ]] && p10k segment -i '●' -f 34
+}
+
+function prompt_my_zshinit_errors() {
+  local n=${ZSHINIT_NUM_ERRORS:-0}
+  (( n > 0 )) && p10k segment -i '●' -f 210
 }
