@@ -83,7 +83,9 @@ fi
 
 # FYI: HOMEBREW_PREFIX is set in .zprofile (which runs before .zshrc)
 _antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
-if [[ -r "$_antidote_zsh" ]]; then
+if [[ -z "$HOMEBREW_PREFIX" ]]; then
+  _zshinit_log "HOMEBREW_PREFIX is not set; cannot locate Antidote."
+elif [[ -r "$_antidote_zsh" ]]; then
   source "$_antidote_zsh"
 else
   _zshinit_log "Antidote script not readable at '$_antidote_zsh'."
@@ -112,7 +114,7 @@ fi
 autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
 compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
 
-# plugin zsh-history-substring-search key bindings)
+# plugin zsh-history-substring-search key bindings
 # up/down arrows
 bindkey '^[[A' history-substring-search-up
 bindkey '^[[B' history-substring-search-down
