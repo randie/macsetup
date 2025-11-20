@@ -5,13 +5,14 @@
 #
 # What this script does (step-by-step):
 #   1) pre_flight:
-#        • parse_args — parse flags and configure behavior
-#        • setup_colors — apply color settings once (after flags parsed)
-#        • ensure_preconditions — verify we are on macOS and that Xcode CLT exist
+#        • parse_args — parse commandline arguments and configure behavior
+#        • setup_colors — apply color settings (must be called after parse_args)
+#        • ensure_preconditions — verify we are on macOS, Xcode CLT exist, etc.
 #        • ensure_bare_repo — verify a bare Git repo exists at $HOME/macsetup-bare
 #        • ensure_homebrew — verify that Homebrew is installed; install if needed
 #        • backup_existing_config — back up any tracked files that already exist
 #   2) apply_my_config:
+#        • checkout files from the bare repo into $HOME
 #        • brew_install_packages - brew install packages listed in $BREWFILE
 #        • apply_iterm2_config - import and point iTerm2 at tracked plist/config dir
 #        • chsh_to_zsh - set login shell to Homebrew zsh
@@ -26,7 +27,7 @@
 #       [warn]    -> yellow
 #       ERROR:    -> red
 #       [verbose] -> white (high contrast)
-#   • Colors are enabled once in pre_flight() by setup_colors() AFTER parsing flags:
+#   • Colors are enabled once in pre_flight() by setup_colors():
 #       - Colors require a TTY ( [[ -t 1 ]] ) and a working `tput`
 #       - Pass --no-color to disable colorized output
 #
