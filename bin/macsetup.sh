@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
-# ==============================================================================
+# ------------------------------------------------------------------------------
 # macsetup.sh — Bootstrap a new macOS (Intel or Apple Silicon) machine
-# ==============================================================================
+# ------------------------------------------------------------------------------
 #
 # What this script does (step-by-step):
-#   1) init:
-#        • parse_args        — parse flags and configure behavior
-#        • setup_colors      — apply color settings once (after flags parsed)
-#        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
-#        • mkdir -p          — ensure scratch directory exists
-#   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup-bare exists
-#   3) backup_existing_config:
-#        • get list of TRACKED_FILES excluding README*
-#        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
-#        • back up EXISTING_TRACKED_FILES to $SCRATCH_DIR/macsetup-backup-YYMMDDHHMM.tar
-#        • remove backed-up EXISTING_TRACKED_FILES to avoid checkout conflicts
-#   4) apply_my_config:
-#        • check out dotfiles from the bare repo into $HOME (hide untracked files in status)
-#        • brew_install_packages (brew install packages listed in $BREWFILE)
-#        • install_oh_my_zsh     (placeholder; no-op except a warning)
-#        • chsh_to_zsh           (placeholder; no-op except a warning)
-#   5) wrap_up:
-#        • print backup location and a handy alias for working with your bare repo
+#   1) pre_flight:
+#        • parse_args — parse flags and configure behavior
+#        • setup_colors — apply color settings once (after flags parsed)
+#        • ensure_preconditions — verify we are on macOS and that Xcode CLT exist
+#        • ensure_bare_repo — verify a bare Git repo exists at $HOME/macsetup-bare
+#        • ensure_homebrew — verify that Homebrew is installed; install if needed
+#        • backup_existing_config — back up any tracked files that already exist
+#   2) apply_my_config:
+#        • brew_install_packages - brew install packages listed in $BREWFILE
+#        • apply_iterm2_config - import and point iTerm2 at tracked plist/config dir
+#        • chsh_to_zsh - set login shell to Homebrew zsh
+#   3) post_flight:
+#        • ensure_postconditions — verify that the post-flight conditions are met
+#        • wrap_up_message — print a wrap-up message
+#        • print_manual_actions_summary — print a summary of manual actions required
 #
 # Colorized logging:
 #   • Log levels:
@@ -30,9 +26,9 @@
 #       [warn]    -> yellow
 #       ERROR:    -> red
 #       [verbose] -> white (high contrast)
-#   • Colors are enabled once in init() by setup_colors() AFTER parsing flags:
+#   • Colors are enabled once in pre_flight() by setup_colors() AFTER parsing flags:
 #       - Colors require a TTY ( [[ -t 1 ]] ) and a working `tput`
-#       - Pass --no-color to disable
+#       - Pass --no-color to disable colorized output
 #
 # Safety & repeatability:
 #   • Tracked files that already exist in $HOME are backed up before they get replaced
@@ -41,15 +37,14 @@
 # Usage:
 #   macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
 #
-# Exit codes (convention):
+# Exit codes:
 #   0  success
 #   1  generic failure
 #   3  brew bundle failed - Brewfile not found or unreadable
 #   4  brew bundle failed - brew bundle did not complete successfully
 #  64  usage error (unknown flag)
 #
-# ==============================================================================
-
+# ------------------------------------------------------------------------------
 
 # Fail-fast settings:
 #   -E  ensure ERR traps propagate in functions/subshells
