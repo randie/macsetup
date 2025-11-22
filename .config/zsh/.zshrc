@@ -81,49 +81,67 @@ fi
 
 # ------------------------------ Antidote ---------------------------------
 
-# FYI: HOMEBREW_PREFIX is set in .zprofile (which runs before .zshrc)
-_antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
-if [[ -z "$HOMEBREW_PREFIX" ]]; then
-  _zshinit_log "HOMEBREW_PREFIX is not set; cannot locate Antidote."
-elif [[ -r "$_antidote_zsh" ]]; then
-  source "$_antidote_zsh"
+# FYI: HOMEBREW_PREFIX is set in .zprofile (by running  `brew shellenv`)
+# Fallback: if this is a non-login interactive shell where .zprofile did not run,
+# and HOMEBREW_PREFIX is empty, attempt to obtain it from `brew --prefix`.
+if [[ -z "$HOMEBREW_PREFIX" ]] && command -v brew >/dev/null 2>&1; then
+  HOMEBREW_PREFIX="$(brew --prefix 2>/dev/null)"
+fi
+
+# Only construct and source the Antidote script path if HOMEBREW_PREFIX is set
+if [[ -n "$HOMEBREW_PREFIX" ]]; then
+  _antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
+  if [[ -r "$_antidote_zsh" ]]; then
+    source "$_antidote_zsh"
+  else
+    _zshinit_log "Antidote script not readable at '$_antidote_zsh'."
+  fi
+  unset _antidote_zsh
 else
-  _zshinit_log "Antidote script not readable at '$_antidote_zsh'."
-fi
-unset _antidote_zsh
-
-typeset -gA _antidote_paths
-_antidote_paths[txt]="$XDG_CONFIG_HOME/zsh/.zsh_plugins.txt"
-_antidote_paths[zsh]="$XDG_CACHE_HOME/zsh/.zsh_plugins.zsh"
-mkdir -p "${_antidote_paths[zsh]:h}"
-
-# Rebuild bundle only if bundle file doesn't exist, or plugins file is newer than bundle file
-if [[ ! -r "${_antidote_paths[zsh]}" || "${_antidote_paths[txt]}" -nt "${_antidote_paths[zsh]}" ]]; then
-  antidote bundle < "${_antidote_paths[txt]}" > "${_antidote_paths[zsh]}"
+  _zshinit_log "HOMEBREW_PREFIX is not set; cannot locate Antidote."
 fi
 
-if [[ -r "${_antidote_paths[zsh]}" ]]; then
-  if ! source "${_antidote_paths[zsh]}"; then
-    _zshinit_log "Sourcing Antidote bundle '${_antidote_paths[zsh]}' failed; zsh plugins may not be loaded."
+if command -v antidote >/dev/null 2>&1; then
+  typeset -gA _antidote_paths
+  _antidote_paths[txt]="$XDG_CONFIG_HOME/zsh/.zsh_plugins.txt"
+  _antidote_paths[zsh]="$XDG_CACHE_HOME/zsh/.zsh_plugins.zsh"
+  mkdir -p "${_antidote_paths[zsh]:h}"
+
+  # Rebuild bundle only if bundle file doesn't exist, or plugins file is newer than bundle file
+  if [[ ! -r "${_antidote_paths[zsh]}" || "${_antidote_paths[txt]}" -nt "${_antidote_paths[zsh]}" ]]; then
+    antidote bundle < "${_antidote_paths[txt]}" > "${_antidote_paths[zsh]}"
+  fi
+
+  if [[ -r "${_antidote_paths[zsh]}" ]]; then
+    if ! source "${_antidote_paths[zsh]}"; then
+      _zshinit_log "Sourcing Antidote bundle '${_antidote_paths[zsh]}' failed; zsh plugins may not be loaded."
+    fi
+  else
+    _zshinit_log "Antidote bundle not readable at '${_antidote_paths[zsh]}'; zsh plugins not loaded."
   fi
 else
-  _zshinit_log "Antidote bundle not readable at '${_antidote_paths[zsh]}'; zsh plugins not loaded."
+  _zshinit_log "antidote command not found; zsh plugins will not be loaded."
+fi
+
+# plugin zsh-history-substring-search key bindings
+# Only define these if the plugin actually loaded (widgets exist)
+if zle -l | grep -q 'history-substring-search-up'; then
+  # up/down arrows
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+  # vi normal mode bindings (j/k)
+  bindkey -M vicmd 'k' history-substring-search-up
+  bindkey -M vicmd 'j' history-substring-search-down
+  # # emacs-style bindings
+  # bindkey -M emacs '^P' history-substring-search-up
+  # bindkey -M emacs '^N' history-substring-search-down
+else
+  _zshinit_log "history-substring-search plugin not loaded; skipping key bindings."
 fi
 
 # Initialize completions *after* plugins adjust $fpath
 autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
 compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
-
-# plugin zsh-history-substring-search key bindings
-# up/down arrows
-bindkey '^[[A' history-substring-search-up
-bindkey '^[[B' history-substring-search-down
-# vi normal mode bindings (j/k)
-bindkey -M vicmd 'k' history-substring-search-up
-bindkey -M vicmd 'j' history-substring-search-down
-# # emacs-style bindings
-# bindkey -M emacs '^P' history-substring-search-up
-# bindkey -M emacs '^N' history-substring-search-down
 
 # ---------------------------------- Aliases -----------------------------------
 
