@@ -210,9 +210,9 @@ parse_args() {
 # --------------------------- ensure homebrew exists ---------------------------
 
 ensure_homebrew() {
-  if command -v brew > /dev/null 2>&1; then
+  if brew --version >/dev/null 2>&1; then
     log_verbose "Homebrew is already installed at: $(command -v brew)"
-    eval "$(brew shellenv)"
+    [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
     return 0
   fi
 
@@ -263,9 +263,6 @@ ensure_bare_repo() {
     if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
       log_verbose "Bare repo exists @ $BARE_REPO"
     else
-      # log_info "Cloning bare repo"
-      # git clone --bare "$GITHUB_REPO" "$BARE_REPO"
-
       # If you're running this script, then a bare repo should already exist
       # in $HOME/macsetup-bare since this script would have been checked out
       # from that bare repo (if instructions in README.md were followed).
