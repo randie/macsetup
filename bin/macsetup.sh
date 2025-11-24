@@ -211,15 +211,15 @@ parse_args() {
 
 ensure_homebrew() {
   if brew --version >/dev/null 2>&1; then
-    log_verbose "Homebrew is already installed at: $(command -v brew)"
+    log_verbose "Homebrew is already installed at: $(brew --prefix)"
     [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
     return 0
   fi
 
   if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
     if command -v brew > /dev/null 2>&1; then
-      log_verbose "Homebrew installed successfully at: $(command -v brew)"
-      eval "$(brew shellenv)"
+      log_verbose "Homebrew installed successfully at: $(brew --prefix)"
+      [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
     else
       local found=""
       for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
@@ -290,8 +290,9 @@ backup_existing_config() {(
   cd "$HOME"
 
   # List tracked files, excluding README* files
-  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
-    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
+  # git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
+  #   | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
+  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD > "$TRACKED_FILES"
 
   # List which of those tracked files already exist
   while IFS= read -r f; do
