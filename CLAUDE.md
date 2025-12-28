@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a macOS dotfiles and bootstrap repository using a **bare git repo workflow**. The bare repo (`~/macsetup.git`) tracks dotfiles directly in `$HOME` without cluttering it with a `.git` directory.
+This is a macOS dotfiles and bootstrap repository using a **bare git repo workflow**. The bare repo (`~/macsetup-bare`) tracks dotfiles directly in `$HOME` without cluttering it with a `.git` directory.
 
 ## Key Commands
 
@@ -23,7 +23,7 @@ $HOME/bin/macsetup.sh --help
 ### Working with the Bare Repo
 The `c` alias is used for all git operations on this repo:
 ```bash
-alias c='git --no-pager --git-dir=$HOME/macsetup.git --work-tree=$HOME'
+alias c='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
 
 c status -s     # cs
 c add <file>    # ca
@@ -45,14 +45,14 @@ brew bundle check --file=$HOME/.config/brew/Brewfile
 ## Architecture
 
 ### Bare Repo Workflow
-- **Bare repo location**: `~/macsetup.git` (no working tree)
+- **Bare repo location**: `~/macsetup-bare` (no working tree)
 - **Work tree**: `$HOME` (dotfiles checked out directly to home)
 - Config hides untracked files: `status.showUntrackedFiles no`
 
 ### Directory Structure
 ```
 $HOME/
-├── macsetup.git/           # bare git repo (internal git structures)
+├── macsetup-bare/          # bare git repo (internal git structures)
 ├── bin/                    # utility scripts (macsetup.sh, etc.)
 └── .config/
     ├── brew/Brewfile       # Homebrew packages, casks, vscode extensions
@@ -67,7 +67,7 @@ $HOME/
 
 ### macsetup.sh Flow
 1. `init` - parse args, setup colors, verify Xcode CLT, create scratch dir
-2. `ensure_bare_repo` - clone or verify `~/macsetup.git`
+2. `ensure_bare_repo` - clone or verify `~/macsetup-bare`
 3. `backup_existing_config` - tarball existing tracked files to `~/.scratch/macsetup/`
 4. `apply_my_config` - checkout dotfiles, run `brew bundle`, configure iTerm2
 5. `wrap_up` - print summary and alias reminder

@@ -10,7 +10,7 @@
 #        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
 #        • mkdir -p          — ensure scratch directory exists
 #   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup.git exists, clone if missing
+#        • make sure $HOME/macsetup-bare exists, clone if missing
 #   3) backup_existing_config:
 #        • get list of TRACKED_FILES excluding README*
 #        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
@@ -62,7 +62,7 @@ trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s w
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/$MACSETUP.git"
+readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
