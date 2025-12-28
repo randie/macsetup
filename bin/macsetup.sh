@@ -195,10 +195,12 @@ brew_install_packages() {
 
   ensure_homebrew
 
-  [[ ! -f "$BREWFILE" ]] && log_error "$BREWFILE not found" && exit 1
+  if [[ ! -f "$BREWFILE" ]]; then
+    log_error "$BREWFILE not found"
+    exit 1
+  fi
 
-  brew bundle --file="$BREWFILE"
-  if [[ "$?" -ne 0 ]]; then
+  if ! brew bundle --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
     exit 3
   fi
@@ -236,27 +238,27 @@ backup_existing_config() {(
   local -r TRACKED_FILES="$SCRATCH_DIR/tracked-files.txt"
   local -r EXISTING_TRACKED_FILES="$SCRATCH_DIR/existing-tracked-files.txt"
 
-  cd $HOME
+  cd "$HOME"
 
   # List tracked files, excluding README* files
-  git --no-pager --git-dir=$BARE_REPO ls-tree --full-tree -r --name-only HEAD \
-    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > $TRACKED_FILES
+  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
+    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
 
   # List which of those tracked files already exist
   while IFS= read -r f; do
     [ -e "$f" ] && echo "$f"
-  done < $TRACKED_FILES > $EXISTING_TRACKED_FILES
+  done < "$TRACKED_FILES" > "$EXISTING_TRACKED_FILES"
 
-  if [[ -s $EXISTING_TRACKED_FILES ]]; then
+  if [[ -s "$EXISTING_TRACKED_FILES" ]]; then
     # Create a backup tarball rooted at $HOME (entries are relative paths)
-    tar cf $BACKUP_TAR -T $EXISTING_TRACKED_FILES
+    tar cf "$BACKUP_TAR" -T "$EXISTING_TRACKED_FILES"
     log_verbose "Created backup: $BACKUP_TAR"
 
     # Remove existing tracked files that were backed up to $BACKUP_TAR
     # for f in $(tar tf $BACKUP_TAR); do
     #   [[ -e $f ]] && rm -f $f
     # done
-    tar tf $BACKUP_TAR | while IFS= read -r f; do
+    tar tf "$BACKUP_TAR" | while IFS= read -r f; do
       [[ -e "$f" ]] && rm -f -- "$f"
     done
     log_verbose "Removed existing tracked files"
@@ -376,17 +378,15 @@ apply_my_config() {
   git --git-dir="$BARE_REPO" --work-tree="$HOME" config --local status.showUntrackedFiles no
 
   # Check out dotfiles from the bare repo into $HOME
-  git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f
-
-  if [[ "$?" -ne 0 ]]; then
+  if ! git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
     log_error "Failed to checkout dotfiles from the bare repo into $HOME"
     exit 1
-  else
-    brew_install_packages
-    install_oh_my_zsh
-    apply_iterm2_config
-    chsh_to_zsh
   fi
+
+  brew_install_packages
+  install_oh_my_zsh
+  apply_iterm2_config
+  chsh_to_zsh
 }
 
 # ---------------------------------- wrap up -----------------------------------
