@@ -10,7 +10,7 @@
 #        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
 #        • mkdir -p          — ensure scratch directory exists
 #   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup.git exists, clone if missing
+#        • make sure $HOME/macsetup-bare exists, clone if missing
 #   3) backup_existing_config:
 #        • get list of TRACKED_FILES excluding README*
 #        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
@@ -62,7 +62,7 @@ trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s w
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/$MACSETUP.git"
+readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
@@ -351,8 +351,8 @@ apply_iterm2_config() {
     # cp -f "$plist_src" "$SYS_PLIST" 2>/dev/null || true
   fi
 
-  # Point iTerm2 at CONFIG_DIR for load/save of iterm2 settings
-  defaults write "$DOMAIN" PrefsCustomFolder -string "$CONFIG_DIR"
+  # Point iTerm2 at ITERM2_CONFIG_DIR for load/save of iterm2 settings
+  defaults write "$DOMAIN" PrefsCustomFolder -string "$ITERM2_CONFIG_DIR"
   defaults write "$DOMAIN" LoadPrefsFromCustomFolder -bool true
 
   # Suppress the nag dialog about custom prefs not syncing
@@ -361,7 +361,7 @@ apply_iterm2_config() {
   # Flush settings cache
   killall -u "$USER" cfprefsd > /dev/null 2>&1 || true
 
-  log_info "iTerm2 is set to load & save settings from: $CONFIG_DIR"
+  log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
   log_info "Tracked XML plist updated (if possible): $PLIST_XML"
   log_info "If iTerm2 is running, quit and relaunch to pick up changes."
 }
