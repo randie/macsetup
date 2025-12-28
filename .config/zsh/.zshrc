@@ -12,11 +12,6 @@
 # [y/n] confirmations, etc.) should go above this block; everything else
 # goes below.
 
-# Enable Powerlevel10k's instant prompt. Silence warnings about writing to
-# stdout/stderr during .zshrc to keep startup fast/clean. Messages must be
-# deferred (e.g. via precmd) or logged to avoid garbling the prompt
-typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
-
 # Use XDG cache for P10K’s instant prompt
 if [[ -r "$XDG_CACHE_HOME/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "$XDG_CACHE_HOME/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -29,28 +24,6 @@ fi
 # Lower values make vi-mode ESC feel snappier.
 # Higher values give you more time to type ESC-prefixed combos.
 typeset -g KEYTIMEOUT=5
-
-
-# ---------------------------------- Homebrew ----------------------------------
-
-# HOMEBREW_PREFIX (used below) is the path to Homebrew’s installations,
-# and is set in .zprofile (by running `brew shellenv`).
-
-# Homebrew command-not-found integration
-_handler_sh="$HOMEBREW_PREFIX/Library/Taps/homebrew/homebrew-command-not-found/handler.sh"
-if [[ -n $HOMEBREW_PREFIX && -r $_handler_sh ]]; then
-  source "$_handler_sh"
-
-  # Silence auto-update during command-not-found suggestions
-  if typeset -f command_not_found_handler >/dev/null; then
-    functions -c command_not_found_handler _handler_copy
-    command_not_found_handler() {
-      HOMEBREW_NO_AUTO_UPDATE=1 _handler_copy "$@"
-    }
-    unset _handler_copy
-  fi
-fi
-unset _handler_sh
 
 # ------------------------------- History options ------------------------------
 
@@ -79,7 +52,6 @@ setopt EXTENDED_GLOB               # enable advanced globbing operators
 
 # Autoload functions in $XDG_CONFIG_HOME/zsh/functions
 typeset -g ZFUNCDIR="$XDG_CONFIG_HOME/zsh/functions"
-mkdir -p $ZFUNCDIR
 typeset -gU fpath=("$ZFUNCDIR" $fpath)
 autoload -Uz $ZFUNCDIR/*(.N:t)
 
@@ -88,44 +60,88 @@ autoload -Uz $ZFUNCDIR/*(.N:t)
 # direnv (directory-local env)
 if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook zsh)"
+else
+  _zshinit_log "direnv not found; directory-local environment hooks will not be active."
 fi
 
 # VS Code shell integration (only inside VS Code terminal)
-if [[ "$TERM_PROGRAM" == "vscode" ]] && command -v code >/dev/null 2>&1; then
-  _vscode_zsh_integration="$(code --locate-shell-integration-path zsh 2>/dev/null)"
-  [[ -r "$_vscode_zsh_integration" ]] && source "$_vscode_zsh_integration"
-  unset _vscode_zsh_integration
+if [[ "$TERM_PROGRAM" == "vscode" ]]; then
+  if command -v code >/dev/null 2>&1; then
+    _vscode_zsh_integration="$(code --locate-shell-integration-path zsh 2>/dev/null)"
+    if [[ -r "$_vscode_zsh_integration" ]]; then
+      source "$_vscode_zsh_integration"
+    else
+      _zshinit_log "VS Code zsh integration file not readable: '$_vscode_zsh_integration'."
+    fi
+    unset _vscode_zsh_integration
+  else
+    _zshinit_log "code not found; VS Code shell integration will not be active."
+  fi
 fi
 
-# Activate autojump plugin
-if [[ -n $HOMEBREW_PREFIX ]]; then
-  _autojump_sh="$HOMEBREW_PREFIX/etc/profile.d/autojump.sh"
-  [[ -r "$_autojump_sh" ]] && source "$_autojump_sh"
-  unset _autojump_sh
+# ------------------------------ Antidote ---------------------------------
+
+# FYI: HOMEBREW_PREFIX is set in .zprofile (by running  `brew shellenv`)
+# Fallback: if this is a non-login interactive shell where .zprofile did not run,
+# and HOMEBREW_PREFIX is empty, attempt to obtain it from `brew --prefix`.
+if [[ -z "$HOMEBREW_PREFIX" ]] && command -v brew >/dev/null 2>&1; then
+  HOMEBREW_PREFIX="$(brew --prefix 2>/dev/null)"
 fi
 
-# --------------------------------- Oh My Zsh ----------------------------------
-
-typeset -g ZSH="$HOME/.oh-my-zsh"
-typeset -g ZSH_THEME="powerlevel10k/powerlevel10k"
-
-# Keep 'zsh-syntax-highlighting' LAST per its docs; include 'vi-mode'
-# TODO: add 'autojump' back?
-plugins=(
-  git
-  direnv
-  vi-mode
-  zsh-autosuggestions
-  zsh-syntax-highlighting
-)
-
-# Load Oh My Zsh (silent if missing)
-[[ -r "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
-
-# If OMZ is absent (e.g., fresh machine), ensure completion still works
-if [[ ! -r "$ZSH/oh-my-zsh.sh" ]]; then
-  autoload -Uz compinit && compinit -u
+# Only construct and source the Antidote script path if HOMEBREW_PREFIX is set
+if [[ -n "$HOMEBREW_PREFIX" ]]; then
+  _antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
+  if [[ -r "$_antidote_zsh" ]]; then
+    source "$_antidote_zsh"
+  else
+    _zshinit_log "Antidote script not readable at '$_antidote_zsh'."
+  fi
+  unset _antidote_zsh
+else
+  _zshinit_log "HOMEBREW_PREFIX is not set; cannot locate Antidote."
 fi
+
+if command -v antidote >/dev/null 2>&1; then
+  typeset -gA _antidote_paths
+  _antidote_paths[txt]="$XDG_CONFIG_HOME/zsh/.zsh_plugins.txt"
+  _antidote_paths[zsh]="$XDG_CACHE_HOME/zsh/.zsh_plugins.zsh"
+  mkdir -p "${_antidote_paths[zsh]:h}"
+
+  # Rebuild bundle only if bundle file doesn't exist, or plugins file is newer than bundle file
+  if [[ ! -r "${_antidote_paths[zsh]}" || "${_antidote_paths[txt]}" -nt "${_antidote_paths[zsh]}" ]]; then
+    antidote bundle < "${_antidote_paths[txt]}" > "${_antidote_paths[zsh]}"
+  fi
+
+  if [[ -r "${_antidote_paths[zsh]}" ]]; then
+    if ! source "${_antidote_paths[zsh]}"; then
+      _zshinit_log "Sourcing Antidote bundle '${_antidote_paths[zsh]}' failed; zsh plugins may not be loaded."
+    fi
+  else
+    _zshinit_log "Antidote bundle not readable at '${_antidote_paths[zsh]}'; zsh plugins not loaded."
+  fi
+else
+  _zshinit_log "antidote command not found; zsh plugins will not be loaded."
+fi
+
+# plugin zsh-history-substring-search key bindings
+# Only define these if the plugin actually loaded (widgets exist)
+if zle -l | grep -q 'history-substring-search-up'; then
+  # up/down arrows
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+  # vi normal mode bindings (j/k)
+  bindkey -M vicmd 'k' history-substring-search-up
+  bindkey -M vicmd 'j' history-substring-search-down
+  # # emacs-style bindings
+  # bindkey -M emacs '^P' history-substring-search-up
+  # bindkey -M emacs '^N' history-substring-search-down
+else
+  _zshinit_log "history-substring-search plugin not loaded; skipping key bindings."
+fi
+
+# Initialize completions *after* plugins adjust $fpath
+autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
+compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
 
 # ---------------------------------- Aliases -----------------------------------
 
@@ -168,5 +184,6 @@ alias cls='c ls-tree --full-tree -r --name-only HEAD'
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
 # To customize prompt, run `p10k configure` or edit ~/.config/zsh/p10k/.p10k.zsh
-# [[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
-[[ -f "$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh" ]] && source "$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh"
+_p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh" 
+[[ -f "$_p10k_zsh" ]] && source "$_p10k_zsh"
+unset _p10k_zsh

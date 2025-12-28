@@ -1,6 +1,14 @@
 ╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:29 PM
+╰─❯ scutil --get LocalHostName
+mozart
+
+╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:29 PM
 ╰─❯ date
 Thu Aug 28 18:59:39 PDT 2025
+
+╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:30 PM
+╰─❯ which c
+c: aliased to git --no-pager --git-dir=/Users/randie/myconfig-bare --work-tree=/Users/randie
 
 ╭─ ~/.config/iterm2 ──────────────────────────────────────────────────────────────────── 06:59:39 PM
 ╰─❯ c rev-parse --short HEAD

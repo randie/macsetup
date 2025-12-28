@@ -8,23 +8,24 @@ My Mac dot files and setup script for quickly bootstrapping a new MacBook (Intel
 
 ---
 
-## Bootstrap (3 steps)
+## Bootstrap
 
 ```bash
-# Step 1: Clone the bare repo
-# NOTE: This step assumes you already have a github ssh key set up.
-# If not, clone from https://github.com/randie/macsetup.git instead.
-git clone --bare git@github.com:randie/macsetup.git
+# Step 0: Go to your home directory
+cd $HOME
+
+# Step 1: Clone a bare repo to macsetup-bare
+git clone --bare git@github.com:randie/macsetup.git macsetup-bare
 
 # Step 2: Check out macsetup.sh from the bare repo
-git --git-dir=$HOME/macsetup.git --work-tree=$HOME checkout main -- bin/macsetup.sh
+git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
 
 # Step 3: Run it
-$HOME/bin/macsetup.sh
+./bin/macsetup.sh --verbose
 ```
 
 > Replace `main` with your actual default branch if different.  
-> From here, `macsetup.sh` creates its own scratch directory, backs up existing files, checks out dotfiles, and handles the rest.
+> From here, `macsetup.sh` creates its own scratch directory, backs up existing [tracked] files, checks out dotfiles, and handles the rest.
 
 ---
 
@@ -32,34 +33,34 @@ $HOME/bin/macsetup.sh
 
 The following files from this repo will override what’s already on your Mac when you run `macsetup.sh`. Don’t worry — before anything is replaced, the script automatically creates a backup tarball so you can restore your previous versions if needed.
 
-| Category            | Path / File                                   | Description                         |
-|---------------------|-----------------------------------------------|-------------------------------------|
-| **Dotfiles**        | `.Brewfile`                                   | Homebrew package/cask list          |
-|                     | `.condarc`                                    | Conda configuration                 |
-|                     | `.gitignore`                                  | Global gitignore                    |
-|                     | `.p10k.zsh`                                   | Powerlevel10k prompt config         |
-|                     | `.vimrc`                                      | Vim configuration                   |
-|                     | `.zshrc`                                      | Zsh configuration                   |
-|                     | `README.md`                                   | This file                           |
-| **App Config**      | `.config/gh/config.yml`                       | GitHub CLI configuration            |
-|                     | `.config/iterm2/com.googlecode.iterm2.plist`  | iTerm2 preferences                  |
-| **Scripts**         | `bin/cleanpath`                               | Path cleaner                        |
-|                     | `bin/cpdir`                                   | Directory copy helper               |
-|                     | `bin/diff-from-base`                          | Git diff helper                     |
-|                     | `bin/docker_cleanup.sh`                       | Docker cleanup utility              |
-|                     | `bin/docker_list_images`                      | Docker image lister                 |
-|                     | `bin/enkrypt`                                 | Encryption helper                   |
-|                     | `bin/git-rename-remote-branch.sh`             | Git branch renamer                  |
-|                     | `bin/grepl`                                   | Grep wrapper                        |
-|                     | `bin/hardpath`                                | Path resolver                       |
-|                     | `bin/killp`                                   | Kill process helper                 |
-|                     | `bin/my-functions/dec`                        | Decryption helper                   |
-|                     | `bin/my-functions/enc`                        | Encryption helper                   |
-|                     | `bin/macsetup.sh`                             | Main bootstrap script               |
-|                     | `bin/pr-for-commit`                           | PR helper                           |
-|                     | `bin/save`                                    | File saver                          |
-|                     | `bin/symdiff`                                 | Diff helper                         |
-| **Editor Settings** | `save/vscode-settings.json`                   | VSCode settings                     |
+| Category            | Path / File                                  | Description                 |
+| ------------------- | -------------------------------------------- | --------------------------- |
+| **Dotfiles**        | `.Brewfile`                                  | Homebrew package/cask list  |
+|                     | `.condarc`                                   | Conda configuration         |
+|                     | `.gitignore`                                 | Global gitignore            |
+|                     | `.p10k.zsh`                                  | Powerlevel10k prompt config |
+|                     | `.vimrc`                                     | Vim configuration           |
+|                     | `.zshrc`                                     | Zsh configuration           |
+|                     | `README.md`                                  | This file                   |
+| **App Config**      | `.config/gh/config.yml`                      | GitHub CLI configuration    |
+|                     | `.config/iterm2/com.googlecode.iterm2.plist` | iTerm2 preferences          |
+| **Scripts**         | `bin/cleanpath`                              | Path cleaner                |
+|                     | `bin/cpdir`                                  | Directory copy helper       |
+|                     | `bin/diff-from-base`                         | Git diff helper             |
+|                     | `bin/docker_cleanup.sh`                      | Docker cleanup utility      |
+|                     | `bin/docker_list_images`                     | Docker image lister         |
+|                     | `bin/enkrypt`                                | Encryption helper           |
+|                     | `bin/git-rename-remote-branch.sh`            | Git branch renamer          |
+|                     | `bin/grepl`                                  | Grep wrapper                |
+|                     | `bin/hardpath`                               | Path resolver               |
+|                     | `bin/killp`                                  | Kill process helper         |
+|                     | `bin/my-functions/dec`                       | Decryption helper           |
+|                     | `bin/my-functions/enc`                       | Encryption helper           |
+|                     | `bin/macsetup.sh`                            | Main bootstrap script       |
+|                     | `bin/pr-for-commit`                          | PR helper                   |
+|                     | `bin/save`                                   | File saver                  |
+|                     | `bin/symdiff`                                | Diff helper                 |
+| **Editor Settings** | `save/vscode-settings.json`                  | VSCode settings             |
 
 ---
 
@@ -142,27 +143,28 @@ flowchart LR
 
 ```bash
 # Fresh setup
-git clone --bare git@github.com:randie/macsetup.git $HOME/macsetup-bare
-git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout -f main -- bin/macsetup.sh
-$HOME/bin/macsetup.sh -v
+╰─❯ cd $HOME
+╰─❯ git clone --bare git@github.com:randie/macsetup.git macsetup-bare
+╰─❯ git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout -f main -- bin/macsetup.sh
+╰─❯ ./bin/macsetup.sh --verbose
 
 # Sample output (verbose)
 [verbose] script path        : $HOME/bin/macsetup.sh
 [verbose] REPO_ROOT          : $HOME
 [verbose] SCRATCH_OUTDIR     : /tmp/macsetup-scratch
 [verbose] brew available at  : /opt/homebrew/bin/brew
-[verbose] Using Brewfile: $HOME/.Brewfile
-[verbose] Created backup: /tmp/macsetup-backup-2508251530.tar
+[verbose] Using Brewfile     : $HOME/.config/brew/Brewfile
+[verbose] Created backup     : $HOME/macsetup-scratch/macsetup-backup-2508251530.tar
 [verbose] Checked out dotfiles to $HOME
 
 Done!
 
-Backups (if any) were written to:
-    /tmp/macsetup-backup-2508251530.tar
+# Confirm that the c alias is defined in your shell
+╰─❯ alias c
+c='git --no-pager --git-dir=/Users/randie/myconfig-bare --work-tree=/Users/randie'
 
-Make sure the following alias is in your .zshrc file:
-    alias c='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
-    Usage example: c status -s
+# Sample usage of c alias
+╰─❯ c status --short
 ```
 
 ---
@@ -229,7 +231,6 @@ Always review with `tar -tf` before extracting.
 ## Roadmap / TODO
 
 - [ ] Implement `chsh_to_zsh` to switch login shell to brew-installed zsh.  
-- [ ] Implement `install_oh_my_zsh` with idempotent installation.  
 - [ ] Add `--dry-run` mode to preview actions without making changes.  
 - [ ] Prune tracked files in repo to essentials only.  
 
@@ -245,9 +246,8 @@ Running `macsetup.sh` on a new MacBook will:
    - Installs Homebrew (if missing).  
    - Installs packages and apps from Brewfile.  
    - Backs up existing dotfiles.  
-   - Applies dotfiles via the bare repo.  
+   - Applies dotfiles from the bare repo.  
    - (Future) Switches login shell to brew-installed zsh.  
-   - (Future) Installs Oh My Zsh.  
    - Prints wrap-up instructions.  
 
 With this workflow, you can bootstrap a brand-new Mac in minutes, with confidence that everything is tracked and backed up.

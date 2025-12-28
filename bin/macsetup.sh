@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# ==============================================================================
+# ------------------------------------------------------------------------------
 # macsetup.sh — Bootstrap a new macOS (Intel or Apple Silicon) machine
-# ==============================================================================
+# ------------------------------------------------------------------------------
 #
 # What this script does (step-by-step):
-#   1) init:
-#        • parse_args        — parse flags and configure behavior
-#        • setup_colors      — apply color settings once (after flags parsed)
-#        • ensure_xcode_clt  — verify Xcode Command Line Tools are present; exit with instructions if not
-#        • mkdir -p          — ensure scratch directory exists
-#   2) ensure_bare_repo:
-#        • make sure $HOME/macsetup.git exists, clone if missing
-#   3) backup_existing_config:
-#        • get list of TRACKED_FILES excluding README*
-#        • determine which of the tracked files already exist → EXISTING_TRACKED_FILES
-#        • back up EXISTING_TRACKED_FILES to $SCRATCH_DIR/macsetup-backup-YYMMDDHHMM.tar
-#        • remove backed-up EXISTING_TRACKED_FILES to avoid checkout conflicts
-#   4) apply_my_config:
-#        • check out dotfiles from the bare repo into $HOME (hide untracked files in status)
-#        • brew_install_packages (brew install packages listed in $BREWFILE)
-#        • install_oh_my_zsh     (placeholder; no-op except a warning)
-#        • chsh_to_zsh           (placeholder; no-op except a warning)
-#   5) wrap_up:
-#        • print backup location and a handy alias for working with your bare repo
+#   1) pre_flight:
+#        • parse_args — parse commandline arguments and configure behavior
+#        • setup_colors — apply color settings (must be called after parse_args)
+#        • ensure_preconditions — verify we are on macOS, Xcode CLT exist, etc.
+#        • ensure_bare_repo — verify a bare Git repo exists at $HOME/macsetup-bare
+#        • ensure_homebrew — verify that Homebrew is installed; install if needed
+#        • backup_existing_config — back up any tracked files that already exist
+#   2) apply_my_config:
+#        • checkout files from the bare repo into $HOME
+#        • brew_install_packages - brew install packages listed in $BREWFILE
+#        • apply_iterm2_config - import and point iTerm2 at tracked plist/config dir
+#        • chsh_to_zsh - set login shell to Homebrew zsh
+#   3) post_flight:
+#        • ensure_postconditions — verify that the post-flight conditions are met
+#        • wrap_up_message — print a wrap-up message
+#        • print_manual_actions_summary — print a summary of manual actions required
 #
 # Colorized logging:
 #   • Log levels:
@@ -30,9 +27,9 @@
 #       [warn]    -> yellow
 #       ERROR:    -> red
 #       [verbose] -> white (high contrast)
-#   • Colors are enabled once in init() by setup_colors() AFTER parsing flags:
+#   • Colors are enabled once in pre_flight() by setup_colors():
 #       - Colors require a TTY ( [[ -t 1 ]] ) and a working `tput`
-#       - Pass --no-color to disable
+#       - Pass --no-color to disable colorized output
 #
 # Safety & repeatability:
 #   • Tracked files that already exist in $HOME are backed up before they get replaced
@@ -41,35 +38,49 @@
 # Usage:
 #   macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
 #
-# Exit codes (convention):
+# Exit codes:
 #   0  success
 #   1  generic failure
-#   3  brew bundle failed
-#   64 usage error (unknown flag)
+#   3  brew bundle failed - Brewfile not found or unreadable
+#   4  brew bundle failed - brew bundle did not complete successfully
+#  64  usage error (unknown flag)
 #
-# ==============================================================================
+# ------------------------------------------------------------------------------
 
 # Fail-fast settings:
+#   -E  ensure ERR traps propagate in functions/subshells
 #   -e  stop on the first error
 #   -u  error on unset variables
 #   -o  pipefail  catch errors in pipelines
-#   -E  ensure ERR traps propagate in functions/subshells
 set -Eeuo pipefail
+
+# This trap is executed when any command in the script fails;
+# it provides a more detailed error message with the file name,
+# line number, failed command, and exit code.
 trap 'rc=$?; cmd=${BASH_COMMAND:-unknown}; printf "ERROR! %s failed at line %s while running: %s (exit %s).\n" "${BASH_SOURCE[0]}" "${LINENO}" "${cmd}" "${rc}" >&2; exit "$rc"' ERR
 
 # ---------------------------------- globals -----------------------------------
 
+# Setting these color defaults here so logging works even before setup_colors is called,
+# i.e. avoids "unbound variable" errors when logging before setup_colors is called.
+COLOR_INFO=""
+COLOR_WARN=""
+COLOR_ERROR=""
+COLOR_VERBOSE=""
+COLOR_RESET=""
+NO_COLOR=false
+
+VERBOSE=false
+MANUAL_ACTIONS=()
+
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
 readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
-readonly BARE_REPO="$HOME/$MACSETUP.git"
+readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
-readonly SCRATCH_DIR="$HOME/.scratch/$MACSETUP"; mkdir -p "$SCRATCH_DIR"
+readonly SCRATCH_DIR="$HOME/$MACSETUP-scratch"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
-
-VERBOSE=false
-NO_COLOR=false
 
 # ------------------------------ logging helpers -------------------------------
 
@@ -78,20 +89,34 @@ log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
 log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
 log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
+# --------------------------- manual actions helpers ---------------------------
+
+add_manual_action() { MANUAL_ACTIONS+=("$1"); }
+
+print_manual_actions_summary() {
+  if ((${#MANUAL_ACTIONS[@]})); then
+    log_warn "Manual follow-up actions required:"
+    local action
+    for action in "${MANUAL_ACTIONS[@]}"; do
+      printf "  - %s\n" "$action"
+    done
+  fi
+}
+
 # -------------------------- pre- and post-conditions --------------------------
 
 ensure_preconditions() {
-  local fail=0
-
-  # 1) macOS only
+  # 1) Running on macOS
   if [[ "$(uname -s)" != "Darwin" ]]; then
     log_error "This script targets macOS machines only. Detected $(uname -s)."
-    return 1
+    exit 1
   fi
 
-  # 2) Apple Command Line Tools installed
+  local fail=0
+
+  # 2) Xcode Command Line Tools installed
   if [[ ! -x /usr/bin/xcode-select ]] || ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
-    log_error $'Apple Command Line Tools are required.\nInstall: xcode-select --install'
+    log_error $'Xcode Command Line Tools are required.\nInstall: xcode-select --install'
     fail=1
   fi
 
@@ -126,12 +151,10 @@ ensure_postconditions() {
 # ----------------------- colors (conditionally enabled) -----------------------
 
 setup_colors() {
-  COLOR_INFO=""
-  COLOR_WARN=""
-  COLOR_ERROR=""
-  COLOR_VERBOSE=""
-  COLOR_RESET=""
-
+  # Conditionally enable colors if:
+  # - NO_COLOR is not true (i.e. --no-color flag not passed)
+  # - stdout is a TTY (i.e. not redirected to a file)
+  # - tput is available (i.e. a terminal is connected)
   if [[ "$NO_COLOR" != true ]] && [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
     COLOR_INFO=$(tput setaf 2)    # green
     COLOR_WARN=$(tput setaf 3)    # yellow
@@ -145,9 +168,10 @@ setup_colors() {
 
 usage() {
   cat << 'EOF'
-Usage: macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
+Usage: macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 
 Options:
+  -t, --test-mode Run in test mode (no changes to shared/system state)
   -v, --verbose   Print extra diagnostic output
   --no-color      Disable colorized output
   -h, --help      Show this help and exit
@@ -184,53 +208,43 @@ parse_args() {
   done
 }
 
-# ---------------------- ensure Xcode Command Line Tools -----------------------
-
-# ensure_xcode_clt() {
-#   if ! xcode-select -p > /dev/null 2>&1; then
-#     log_error "Xcode Command Line Tools not found."
-#     cat << 'MSG' >&2
-#
-# Please install them manually by running:
-#     xcode-select --install
-#
-# Then re-run this script.
-# MSG
-#     exit 1
-#   fi
-#   log_verbose "Xcode Command Line Tools detected: $(xcode-select -p)"
-# }
-
 # --------------------------- ensure homebrew exists ---------------------------
 
 ensure_homebrew() {
-  if command -v brew > /dev/null 2>&1; then
-    log_verbose "Homebrew is already installed at: $(command -v brew)"
-    eval "$(brew shellenv)"
+  if brew --version >/dev/null 2>&1; then
+    log_verbose "Homebrew is already installed at: $(brew --prefix)"
+    [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
     return 0
   fi
 
-  log_verbose "Installing Homebrew"
-  curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash
+  if [[ "$TEST_MODE" == true ]]; then
+    log_warn "[TEST MODE] Skipping ensure_homebrew (because it would affect system-wide Homebrew)."
+    return 0
+  fi
 
-  if command -v brew > /dev/null 2>&1; then
-    log_verbose "Homebrew installed at: $(command -v brew)"
-    eval "$(brew shellenv)"
-  else
-    local found=""
-    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-      if [[ -x "$b" ]]; then
-        eval "$($b shellenv)"
-        found="$b"
-        break
-      fi
-    done
-    if [[ -z "$found" ]]; then
-      log_error "Homebrew installed but brew command not found in PATH or in standard locations."
-      exit 1
+  if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
+    if command -v brew > /dev/null 2>&1; then
+      log_verbose "Homebrew installed successfully at: $(brew --prefix)"
+      [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
     else
-      log_verbose "brew found at: $found"
+      local found=""
+      for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+        if [[ -x "$b" ]]; then
+          eval "$($b shellenv)"
+          found="$b"
+          break
+        fi
+      done
+      if [[ -z "$found" ]]; then
+        log_error "Homebrew installed but brew command not found in PATH or in standard locations."
+        exit 1
+      else
+        log_verbose "brew found at: $found"
+      fi
     fi
+  else
+    log_error "Homebrew installation failed"
+    exit 1
   fi
 }
 
@@ -243,10 +257,9 @@ brew_install_packages() {
   fi
   if ! brew bundle --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
-    exit 3
+    exit 4
   fi
 }
-
 
 # -------------------------- ensure bare repo exists ---------------------------
 
@@ -254,13 +267,13 @@ ensure_bare_repo() {
     local commit branch
 
     if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
-      # If you're running this script, then you should already have
-      # a bare repo in $HOME/macsetup.git since this script would
-      # have been checked out from that bare repo.
-      log_verbose "Bare repo already exists"
+      log_verbose "Bare repo exists @ $BARE_REPO"
     else
-      log_info "Cloning bare repo"
-      git clone --bare "$GITHUB_REPO" "$BARE_REPO"
+      # If you're running this script, then a bare repo should already exist
+      # in $HOME/macsetup-bare since this script would have been checked out
+      # from that bare repo (if instructions in README.md were followed).
+      log_error "Bare repo does not exist @ $BARE_REPO"
+      exit 1
     fi
 
     if [[ "$VERBOSE" == true ]]; then
@@ -283,8 +296,9 @@ backup_existing_config() {(
   cd "$HOME"
 
   # List tracked files, excluding README* files
-  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
-    | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
+  # git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD \
+  #   | grep -Ev '^(README($|\.md$)|macsetup\.sh$)' > "$TRACKED_FILES"
+  git --no-pager --git-dir="$BARE_REPO" ls-tree --full-tree -r --name-only HEAD > "$TRACKED_FILES"
 
   # List which of those tracked files already exist
   while IFS= read -r f; do
@@ -320,11 +334,20 @@ apply_iterm2_config() {
   local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
 
   # Ensure iTerm2 is installed
-  if ! brew list --cask iterm2 > /dev/null 2>&1; then
-    log_info "Installing iTerm2 (Homebrew cask)"
-    brew install --cask iterm2
+  if [[ "$TEST_MODE" == true ]]; then
+    if ! brew list --cask iterm2 > /dev/null 2>&1; then
+      log_warn "[TEST MODE] iTerm2 cask is not installed. Skipping iTerm2 configuration."
+      return 0
+    else
+      log_verbose "[TEST MODE] iTerm2 already installed; no cask changes will be made."
+    fi
   else
-    log_verbose "iTerm2 already installed"
+    if ! brew list --cask iterm2 > /dev/null 2>&1; then
+      log_info "Installing iTerm2 (Homebrew cask)"
+      brew install --cask iterm2
+    else
+      log_verbose "iTerm2 already installed"
+    fi
   fi
 
   # Pick a source plist in priority order
@@ -400,13 +423,44 @@ apply_iterm2_config() {
 
   log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
   log_info "Tracked XML plist updated (if possible): $PLIST_XML"
-  log_info "If iTerm2 is running, quit and relaunch to pick up changes."
+  add_manual_action "If iTerm2 is running, quit and relaunch it to apply the new iTerm2 settings."
 }
 
-# ---------------------------- not implemented yet -----------------------------
+# ------------------------- change login shell to zsh --------------------------
 
-install_oh_my_zsh() { log_warn "install_oh_my_zsh() is not implemented yet."; }
-chsh_to_zsh() { log_warn "chsh_to_zsh() is not implemented yet."; }
+chsh_to_zsh() {
+  local brew_prefix=""
+  local zsh_path=""
+  local current_shell=""
+  local dscl_output=""
+
+  # Determine Homebrew-installed zsh
+  brew_prefix="$(brew --prefix 2>/dev/null || true)"
+  zsh_path="${brew_prefix}/bin/zsh"
+
+  if [[ -z "$brew_prefix" || ! -x "$zsh_path" ]]; then
+    log_error "Homebrew-installed zsh not found at: $zsh_path"
+    return 1
+  fi
+
+  # Determine the user's actual login shell via Directory Services
+  dscl_output="$(dscl . -read "/Users/$USER" UserShell 2>/dev/null)"
+  current_shell="$(awk 'NF==2 {print $2}' <<< "$dscl_output")"
+
+  # Already Homebrew zsh? Nothing to do.
+  if [[ "$current_shell" == "$zsh_path" ]]; then
+    log_verbose "Login shell is already Homebrew zsh: $current_shell"
+    return 0
+  fi
+
+  # If Homebrew zsh is NOT in /etc/shells, tell the user how to add it.
+  if ! grep -qx "$zsh_path" /etc/shells 2>/dev/null; then
+    add_manual_action "Add Homebrew zsh ($zsh_path) to /etc/shells: echo \"$zsh_path\" | sudo tee -a /etc/shells >/dev/null"
+  fi
+
+  # One clean "chsh" message, outside the if
+  add_manual_action "Change your login shell to Homebrew zsh: chsh -s \"$zsh_path\""
+}
 
 # --------------------------- apply my configuration ---------------------------
 
@@ -417,7 +471,6 @@ apply_my_config() {
   # Check out dotfiles from the bare repo into $HOME
   if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
     brew_install_packages
-    # install_oh_my_zsh    # TODO: switch to antidote
     apply_iterm2_config
     chsh_to_zsh
   else
@@ -449,7 +502,7 @@ EOF
 BARE REPO   : $BARE_REPO
 REPO COMMIT : $repo_commit
 REPO BRANCH : $repo_branch
-BREW PREFIX : $HOMEBREW_PREFIX
+BREW PREFIX : $(brew --prefix)
 BACKUP TAR  : $BACKUP_TAR
 EOF
 )"
@@ -471,6 +524,7 @@ pre_flight() {
 post_flight() {
   ensure_postconditions
   wrap_up_message
+  print_manual_actions_summary
 }
 
 #=======================#
