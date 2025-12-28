@@ -351,8 +351,8 @@ apply_iterm2_config() {
     # cp -f "$plist_src" "$SYS_PLIST" 2>/dev/null || true
   fi
 
-  # Point iTerm2 at CONFIG_DIR for load/save of iterm2 settings
-  defaults write "$DOMAIN" PrefsCustomFolder -string "$CONFIG_DIR"
+  # Point iTerm2 at ITERM2_CONFIG_DIR for load/save of iterm2 settings
+  defaults write "$DOMAIN" PrefsCustomFolder -string "$ITERM2_CONFIG_DIR"
   defaults write "$DOMAIN" LoadPrefsFromCustomFolder -bool true
 
   # Suppress the nag dialog about custom prefs not syncing
@@ -361,7 +361,7 @@ apply_iterm2_config() {
   # Flush settings cache
   killall -u "$USER" cfprefsd > /dev/null 2>&1 || true
 
-  log_info "iTerm2 is set to load & save settings from: $CONFIG_DIR"
+  log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
   log_info "Tracked XML plist updated (if possible): $PLIST_XML"
   log_info "If iTerm2 is running, quit and relaunch to pick up changes."
 }
