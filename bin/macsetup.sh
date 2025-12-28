@@ -168,9 +168,10 @@ setup_colors() {
 
 usage() {
   cat << 'EOF'
-Usage: macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
+Usage: macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 
 Options:
+  -t, --test-mode Run in test mode (no changes to shared/system state)
   -v, --verbose   Print extra diagnostic output
   --no-color      Disable colorized output
   -h, --help      Show this help and exit
@@ -213,6 +214,11 @@ ensure_homebrew() {
   if brew --version >/dev/null 2>&1; then
     log_verbose "Homebrew is already installed at: $(brew --prefix)"
     [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
+    return 0
+  fi
+
+  if [[ "$TEST_MODE" == true ]]; then
+    log_warn "[TEST MODE] Skipping ensure_homebrew (because it would affect system-wide Homebrew)."
     return 0
   fi
 
@@ -328,11 +334,20 @@ apply_iterm2_config() {
   local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
 
   # Ensure iTerm2 is installed
-  if ! brew list --cask iterm2 > /dev/null 2>&1; then
-    log_info "Installing iTerm2 (Homebrew cask)"
-    brew install --cask iterm2
+  if [[ "$TEST_MODE" == true ]]; then
+    if ! brew list --cask iterm2 > /dev/null 2>&1; then
+      log_warn "[TEST MODE] iTerm2 cask is not installed. Skipping iTerm2 configuration."
+      return 0
+    else
+      log_verbose "[TEST MODE] iTerm2 already installed; no cask changes will be made."
+    fi
   else
-    log_verbose "iTerm2 already installed"
+    if ! brew list --cask iterm2 > /dev/null 2>&1; then
+      log_info "Installing iTerm2 (Homebrew cask)"
+      brew install --cask iterm2
+    else
+      log_verbose "iTerm2 already installed"
+    fi
   fi
 
   # Pick a source plist in priority order
