@@ -52,6 +52,7 @@ PAGER="less"
 
 # Redirect less(1) history to XDG state directory
 LESSHISTFILE="$XDG_STATE_HOME/less/history"
+mkdir -p "${LESSHISTFILE%/*}" 2>/dev/null || true
 
 # The localhost's [base]name (i.e. mozart vs. mozart.MG8702 on macOS)
 if [[ "$(uname -s)" == "Darwin" ]]; then

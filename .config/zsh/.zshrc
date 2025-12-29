@@ -90,7 +90,7 @@ fi
 
 # Only construct and source the Antidote script path if HOMEBREW_PREFIX is set
 if [[ -n "$HOMEBREW_PREFIX" ]]; then
-  _antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh" 
+  _antidote_zsh="$HOMEBREW_PREFIX/opt/antidote/share/antidote/antidote.zsh"
   if [[ -r "$_antidote_zsh" ]]; then
     source "$_antidote_zsh"
   else
@@ -184,6 +184,6 @@ alias cls='c ls-tree --full-tree -r --name-only HEAD'
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
 # To customize prompt, run `p10k configure` or edit ~/.config/zsh/p10k/.p10k.zsh
-_p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh" 
+_p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh"
 [[ -f "$_p10k_zsh" ]] && source "$_p10k_zsh"
 unset _p10k_zsh

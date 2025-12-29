@@ -36,7 +36,7 @@
 #   • Re-running converges to the same state (whatever is in the bare repo)
 #
 # Usage:
-#   macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
+#   macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 #
 # Exit codes:
 #   0  success
@@ -71,11 +71,12 @@ COLOR_RESET=""
 NO_COLOR=false
 
 VERBOSE=false
+TEST_MODE=false
 MANUAL_ACTIONS=()
 
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
-readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
+# readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
 readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
@@ -183,6 +184,10 @@ EOF
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      -t | --test-mode)
+        TEST_MODE=true
+        shift
+        ;;
       -v | --verbose)
         VERBOSE=true
         shift
@@ -213,7 +218,7 @@ parse_args() {
 ensure_homebrew() {
   if brew --version >/dev/null 2>&1; then
     log_verbose "Homebrew is already installed at: $(brew --prefix)"
-    [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
+    [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
     return 0
   fi
 
@@ -225,7 +230,7 @@ ensure_homebrew() {
   if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
     if command -v brew > /dev/null 2>&1; then
       log_verbose "Homebrew installed successfully at: $(brew --prefix)"
-      [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
+      [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
     else
       local found=""
       for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
@@ -255,7 +260,14 @@ brew_install_packages() {
     log_error "Brewfile not found or unreadable: $BREWFILE"
     exit 3
   fi
-  if ! brew bundle --file="$BREWFILE"; then
+
+  if [[ "$TEST_MODE" == true ]]; then
+    log_warn "[TEST MODE] Skipping brew bundle in test mode because it would install system-wide packages."
+    return 0
+  fi
+
+  log_info "Installing packages from $BREWFILE"
+  if ! brew bundle --no-lock --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
     exit 4
   fi
@@ -264,23 +276,23 @@ brew_install_packages() {
 # -------------------------- ensure bare repo exists ---------------------------
 
 ensure_bare_repo() {
-    local commit branch
+  local commit branch
 
-    if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
-      log_verbose "Bare repo exists @ $BARE_REPO"
-    else
-      # If you're running this script, then a bare repo should already exist
-      # in $HOME/macsetup-bare since this script would have been checked out
-      # from that bare repo (if instructions in README.md were followed).
-      log_error "Bare repo does not exist @ $BARE_REPO"
-      exit 1
-    fi
+  if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
+    log_verbose "Bare repo exists @ $BARE_REPO"
+  else
+    # If you're running this script, then a bare repo should already exist
+    # in $HOME/macsetup-bare since this script would have been checked out
+    # from that bare repo (if instructions in README.md were followed).
+    log_error "Bare repo does not exist @ $BARE_REPO"
+    exit 1
+  fi
 
-    if [[ "$VERBOSE" == true ]]; then
-      commit="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD)"
-      branch="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD || echo "DETACHED")"
-      log_verbose "Bare repo ready @ $BARE_REPO (commit: ${commit}, branch: ${branch})"
-    fi
+  if [[ "$VERBOSE" == true ]]; then
+    commit="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD)"
+    branch="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD || echo "DETACHED")"
+    log_verbose "Bare repo ready @ $BARE_REPO (commit: ${commit}, branch: ${branch})"
+  fi
 }
 
 # --------------------------- backup existing config ---------------------------
@@ -336,10 +348,10 @@ apply_iterm2_config() {
   # Ensure iTerm2 is installed
   if [[ "$TEST_MODE" == true ]]; then
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
-      log_warn "[TEST MODE] iTerm2 cask is not installed. Skipping iTerm2 configuration."
+      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config in test mode."
       return 0
     else
-      log_verbose "[TEST MODE] iTerm2 already installed; no cask changes will be made."
+      log_verbose "[TEST MODE] iTerm2 is already installed. Skipping iTerm2 config in test mode."
     fi
   else
     if ! brew list --cask iterm2 > /dev/null 2>&1; then

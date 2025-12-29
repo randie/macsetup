@@ -230,7 +230,6 @@ Always review with `tar -tf` before extracting.
 
 ## Roadmap / TODO
 
-- [ ] Implement `chsh_to_zsh` to switch login shell to brew-installed zsh.  
 - [ ] Add `--dry-run` mode to preview actions without making changes.  
 - [ ] Prune tracked files in repo to essentials only.  
 
