@@ -260,6 +260,12 @@ brew_install_packages() {
     log_error "Brewfile not found or unreadable: $BREWFILE"
     exit 3
   fi
+
+  if [[ "$TEST_MODE" == true ]]; then
+    log_warn "[TEST MODE] Skipping brew bundle in test mode because it would install system-wide packages."
+    return 0
+  fi
+
   log_info "Installing packages from $BREWFILE"
   if ! brew bundle --no-lock --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
@@ -342,10 +348,10 @@ apply_iterm2_config() {
   # Ensure iTerm2 is installed
   if [[ "$TEST_MODE" == true ]]; then
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
-      log_warn "[TEST MODE] iTerm2 cask is not installed. Skipping iTerm2 configuration."
+      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config in test mode."
       return 0
     else
-      log_verbose "[TEST MODE] iTerm2 already installed; no cask changes will be made."
+      log_verbose "[TEST MODE] iTerm2 is already installed. Skipping iTerm2 config in test mode."
     fi
   else
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
