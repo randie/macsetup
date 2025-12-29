@@ -15,7 +15,7 @@ My Mac dot files and setup script for quickly bootstrapping a new MacBook (Intel
 cd $HOME
 
 # Step 1: Clone a bare repo to macsetup-bare
-git clone --bare git@github.com:randie/macsetup.git macsetup-bare
+git clone --bare https://github.com/randie/macsetup.git macsetup-bare
 
 # Step 2: Check out macsetup.sh from the bare repo
 git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
