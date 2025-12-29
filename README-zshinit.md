@@ -86,8 +86,9 @@ It sets:
 
 ### **Editor, pager, hostname**
 
-* `EDITOR`, `VISUAL`
-* `LESSHISTFILE`
+* `EDITOR`, `VISUAL`, `FCEDIT`
+* `PAGER="less"`
+* `LESSHISTFILE` (with `mkdir -p` to ensure directory exists)
 * `HOSTNAME` (macOS vs non-macOS logic)
 
 ### **Effect on other files**
@@ -107,6 +108,13 @@ It handles:
 
 * Instant prompt from `$XDG_CACHE_HOME`
 * Full prompt from `$XDG_CONFIG_HOME/zsh/p10k`
+
+### **History configuration**
+
+* `HISTFILE="$XDG_STATE_HOME/zsh/history"`
+* `HISTSIZE=200000` (in-memory)
+* `SAVEHIST=200000` (persistent)
+* Options: `HIST_IGNORE_ALL_DUPS`, `HIST_IGNORE_SPACE`, `EXTENDED_HISTORY`, `INC_APPEND_HISTORY_TIME`, etc.
 
 ### **Function paths**
 
@@ -173,11 +181,17 @@ You may place “welcome messages,” motd, session banners, or startup apps her
 
 ## 1.5 `.zsh_plugins.txt`
 
-List of Antidote-managed plugins. Typically includes:
+List of Antidote-managed plugins:
 
-* `zsh-users/zsh-history-substring-search`
-* `zsh-users/zsh-autosuggestions`
-* `zsh-users/zsh-syntax-highlighting`
+* `getantidote/use-omz` — Oh My Zsh compatibility layer
+* `romkatv/powerlevel10k` — Theme (loaded early)
+* `ohmyzsh/ohmyzsh path:plugins/git` — Git aliases and functions
+* `ohmyzsh/ohmyzsh path:plugins/direnv` — direnv integration
+* `ohmyzsh/ohmyzsh path:plugins/autojump` — Directory jumping
+* `ohmyzsh/ohmyzsh path:plugins/vi-mode` — Vi key bindings
+* `zsh-users/zsh-autosuggestions` — Command suggestions
+* `zsh-users/zsh-history-substring-search` — Smart history search
+* `zsh-users/zsh-syntax-highlighting` — Syntax highlighting (must be last)
 
 Antidote uses this list to build a cached bundle.
 
