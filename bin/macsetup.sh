@@ -350,9 +350,10 @@ apply_iterm2_config() {
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
       log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config in test mode."
       return 0
-    else
-      log_verbose "[TEST MODE] iTerm2 is already installed. Skipping iTerm2 config in test mode."
     fi
+    log_verbose "iTerm2 is already installed."
+    log_warn "[TEST MODE] Skipping iTerm2 config in test mode."
+    return 0
   else
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
       log_info "Installing iTerm2 (Homebrew cask)"
