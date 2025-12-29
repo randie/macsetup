@@ -8,13 +8,29 @@ This is a macOS dotfiles and bootstrap repository using a **bare git repo workfl
 
 ## Key Commands
 
+### Bootstrapping a new Mac
+
+```bash
+# Step 0: Go to your home directory
+cd $HOME
+
+# Step 1: Clone a bare repo to macsetup-bare
+git clone --bare git@github.com:randie/macsetup.git macsetup-bare
+
+# Step 2: Check out macsetup.sh from the bare repo
+git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
+
+# Step 3: Run it
+./bin/macsetup.sh --verbose
+```
+
 ### Running the Bootstrap Script
 ```bash
-# Full bootstrap on a new Mac (after cloning bare repo)
+# Full bootstrap on a new Mac
 $HOME/bin/macsetup.sh
 
 # With verbose output
-$HOME/bin/macsetup.sh -v
+$HOME/bin/macsetup.sh --verbose
 
 # Test mode (no system-wide changes)
 $HOME/bin/macsetup.sh --test-mode
