@@ -218,7 +218,7 @@ parse_args() {
 ensure_homebrew() {
   if brew --version >/dev/null 2>&1; then
     log_verbose "Homebrew is already installed at: $(brew --prefix)"
-    [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
+    [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
     return 0
   fi
 
@@ -230,7 +230,7 @@ ensure_homebrew() {
   if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
     if command -v brew > /dev/null 2>&1; then
       log_verbose "Homebrew installed successfully at: $(brew --prefix)"
-      [[ -n "$HOMEBREW_PREFIX" ]] || eval "$(brew shellenv)"
+      [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
     else
       local found=""
       for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
