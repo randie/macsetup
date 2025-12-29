@@ -76,7 +76,7 @@ MANUAL_ACTIONS=()
 
 readonly NOW="$(date +%y%m%d%H%M)"
 readonly MACSETUP="macsetup"
-readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
+# readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
 readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
 readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
@@ -269,23 +269,23 @@ brew_install_packages() {
 # -------------------------- ensure bare repo exists ---------------------------
 
 ensure_bare_repo() {
-    local commit branch
+  local commit branch
 
-    if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
-      log_verbose "Bare repo exists @ $BARE_REPO"
-    else
-      # If you're running this script, then a bare repo should already exist
-      # in $HOME/macsetup-bare since this script would have been checked out
-      # from that bare repo (if instructions in README.md were followed).
-      log_error "Bare repo does not exist @ $BARE_REPO"
-      exit 1
-    fi
+  if [[ -d "$BARE_REPO" && -d "$BARE_REPO/objects" ]]; then
+    log_verbose "Bare repo exists @ $BARE_REPO"
+  else
+    # If you're running this script, then a bare repo should already exist
+    # in $HOME/macsetup-bare since this script would have been checked out
+    # from that bare repo (if instructions in README.md were followed).
+    log_error "Bare repo does not exist @ $BARE_REPO"
+    exit 1
+  fi
 
-    if [[ "$VERBOSE" == true ]]; then
-      commit="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD)"
-      branch="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD || echo "DETACHED")"
-      log_verbose "Bare repo ready @ $BARE_REPO (commit: ${commit}, branch: ${branch})"
-    fi
+  if [[ "$VERBOSE" == true ]]; then
+    commit="$(git --git-dir="$BARE_REPO" rev-parse --short HEAD)"
+    branch="$(git --git-dir="$BARE_REPO" symbolic-ref -q --short HEAD || echo "DETACHED")"
+    log_verbose "Bare repo ready @ $BARE_REPO (commit: ${commit}, branch: ${branch})"
+  fi
 }
 
 # --------------------------- backup existing config ---------------------------
