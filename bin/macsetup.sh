@@ -261,7 +261,7 @@ brew_install_packages() {
     exit 3
   fi
   log_info "Installing packages from $BREWFILE"
-  if ! brew bundle --file="$BREWFILE"; then
+  if ! brew bundle --no-lock --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
     exit 4
   fi
