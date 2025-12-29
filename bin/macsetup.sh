@@ -223,7 +223,7 @@ ensure_homebrew() {
   fi
 
   if [[ "$TEST_MODE" == true ]]; then
-    log_warn "[TEST MODE] Skipping ensure_homebrew (because it would affect system-wide Homebrew)."
+    log_warn "[TEST MODE] Skipping ensure_homebrew in test mode."
     return 0
   fi
 
@@ -262,7 +262,7 @@ brew_install_packages() {
   fi
 
   if [[ "$TEST_MODE" == true ]]; then
-    log_warn "[TEST MODE] Skipping brew bundle in test mode because it would install system-wide packages."
+    log_warn "[TEST MODE] Skipping brew bundle in test mode."
     return 0
   fi
 
@@ -348,11 +348,12 @@ apply_iterm2_config() {
   # Ensure iTerm2 is installed
   if [[ "$TEST_MODE" == true ]]; then
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
-      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config in test mode."
+      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config."
       return 0
-    else
-      log_verbose "[TEST MODE] iTerm2 is already installed. Skipping iTerm2 config in test mode."
     fi
+    log_verbose "iTerm2 is already installed."
+    log_warn "[TEST MODE] Skipping iTerm2 config in test mode."
+    return 0
   else
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
       log_info "Installing iTerm2 (Homebrew cask)"
