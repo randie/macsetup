@@ -15,7 +15,7 @@ This is a macOS dotfiles and bootstrap repository using a **bare git repo workfl
 cd $HOME
 
 # Step 1: Clone a bare repo to macsetup-bare
-git clone --bare git@github.com:randie/macsetup.git macsetup-bare
+git clone --bare https://github.com/randie/macsetup.git macsetup-bare
 
 # Step 2: Check out macsetup.sh from the bare repo
 git --git-dir=$HOME/macsetup-bare --work-tree=$HOME checkout main -- bin/macsetup.sh
