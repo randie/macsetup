@@ -260,6 +260,7 @@ brew_install_packages() {
     log_error "Brewfile not found or unreadable: $BREWFILE"
     exit 3
   fi
+  log_info "Installing packages from $BREWFILE"
   if ! brew bundle --file="$BREWFILE"; then
     log_error "brew bundle did not complete successfully."
     exit 4
