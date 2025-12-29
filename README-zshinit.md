@@ -183,15 +183,17 @@ You may place “welcome messages,” motd, session banners, or startup apps her
 
 List of Antidote-managed plugins:
 
-* `getantidote/use-omz` — Oh My Zsh compatibility layer
-* `romkatv/powerlevel10k` — Theme (loaded early)
-* `ohmyzsh/ohmyzsh path:plugins/git` — Git aliases and functions
-* `ohmyzsh/ohmyzsh path:plugins/direnv` — direnv integration
-* `ohmyzsh/ohmyzsh path:plugins/autojump` — Directory jumping
-* `ohmyzsh/ohmyzsh path:plugins/vi-mode` — Vi key bindings
-* `zsh-users/zsh-autosuggestions` — Command suggestions
-* `zsh-users/zsh-history-substring-search` — Smart history search
-* `zsh-users/zsh-syntax-highlighting` — Syntax highlighting (must be last)
+| Plugin | Description |
+| ------ | ----------- |
+| `getantidote/use-omz` | Oh My Zsh compatibility layer |
+| `romkatv/powerlevel10k` | Theme (loaded early) |
+| `ohmyzsh/ohmyzsh path:plugins/git` | Git aliases and functions |
+| `ohmyzsh/ohmyzsh path:plugins/direnv` | direnv integration |
+| `ohmyzsh/ohmyzsh path:plugins/autojump` | Directory jumping |
+| `ohmyzsh/ohmyzsh path:plugins/vi-mode` | Vi key bindings |
+| `zsh-users/zsh-autosuggestions` | Command suggestions |
+| `zsh-users/zsh-history-substring-search` | Smart history search |
+| `zsh-users/zsh-syntax-highlighting` | Syntax highlighting (must be last) |
 
 Antidote uses this list to build a cached bundle.
 
