@@ -36,7 +36,7 @@
 #   • Re-running converges to the same state (whatever is in the bare repo)
 #
 # Usage:
-#   macsetup.sh [--verbose|-v] [--no-color] [--help|-h]
+#   macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 #
 # Exit codes:
 #   0  success
@@ -71,6 +71,7 @@ COLOR_RESET=""
 NO_COLOR=false
 
 VERBOSE=false
+TEST_MODE=false
 MANUAL_ACTIONS=()
 
 readonly NOW="$(date +%y%m%d%H%M)"
@@ -183,6 +184,10 @@ EOF
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      -t | --test-mode)
+        TEST_MODE=true
+        shift
+        ;;
       -v | --verbose)
         VERBOSE=true
         shift
