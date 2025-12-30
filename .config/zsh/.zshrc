@@ -40,6 +40,7 @@ setopt APPEND_HISTORY              # append (not overwrite) on shell exit
 setopt INC_APPEND_HISTORY          # write each command to history as it executes
 setopt INC_APPEND_HISTORY_TIME     # preserve correct timestamp order
 setopt HIST_EXPIRE_DUPS_FIRST      # expire duplicate entries first when trimming
+setopt SHARE_HISTORY               # share command history across all sessions
 
 # ----------------------------- Safety/UX options ------------------------------
 
@@ -143,7 +144,7 @@ fi
 autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
 compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
 
-# Case-insensitive completion (so "desk" can complete to "Desktop")
+# Case-insensitive completion (so "desk" + tab can complete to "Desktop")
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 # ---------------------------------- Aliases -----------------------------------

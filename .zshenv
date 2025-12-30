@@ -20,6 +20,14 @@ GIT_CONFIG_GLOBAL="$XDG_CONFIG_HOME/git/config"
 ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 [[ -o login ]] && mkdir -p "$ZDOTDIR/functions" || true
 
+# ------------------------------ history (XDG) ---------------------------------
+
+# Ensure history directory exists (zsh does NOT create HISTFILE parent dirs)
+: "${HISTFILE:=$XDG_STATE_HOME/zsh/history}"
+mkdir -p -- "${HISTFILE:h}" 2>/dev/null || true
+touch -- "$HISTFILE" 2>/dev/null || true
+chmod 600 -- "$HISTFILE" 2>/dev/null || true
+
 # ------------------------------ zshinit logging -------------------------------
 
 # Log file for zsh init deviations from the "happy path"
@@ -56,3 +64,4 @@ _zshinit_log() {
 PS4='+%N:%i:${funcstack[1]:-main}> '
 
 set +o allexport
+
