@@ -227,7 +227,10 @@ ensure_homebrew() {
     return 0
   fi
 
-  if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
+  # IMPORTANT: Don't pipe the installer into a shell, because that makes stdin a pipe
+  # (not a TTY) and Homebrew will switch to non-interactive mode.
+  # if curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | /usr/bin/env bash; then
+  if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; then
     if command -v brew > /dev/null 2>&1; then
       log_verbose "Homebrew installed successfully at: $(brew --prefix)"
       [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
