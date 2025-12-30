@@ -143,6 +143,9 @@ fi
 autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
 compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
 
+# Case-insensitive completion (so "desk" can complete to "Desktop")
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+
 # ---------------------------------- Aliases -----------------------------------
 
 alias a='alias'
@@ -187,3 +190,4 @@ alias cls='c ls-tree --full-tree -r --name-only HEAD'
 _p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh"
 [[ -f "$_p10k_zsh" ]] && source "$_p10k_zsh"
 unset _p10k_zsh
+
