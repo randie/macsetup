@@ -168,10 +168,26 @@ alias mv='mv -i'
 alias rm='rm -i'
 alias lsa='ls -a'
 alias h='history'
+alias d='dirs -v'
+alias dirs='dirs -v'
 alias ss='save -s'
 alias killdock='killall -KILL Dock'
 alias localhost='scutil --get LocalHostName'
 alias sshjj='ssh -i ~/.ssh/hostgator_rsa jj@108.179.232.68 -p2222'
+
+# --- cd aliases ---
+alias -- -='cd -'
+alias ...=../..
+alias ....=../../..
+alias 1='cd -1'
+alias 2='cd -2'
+alias 3='cd -3'
+alias 4='cd -4'
+alias 5='cd -5'
+alias 6='cd -6'
+alias 7='cd -7'
+alias 8='cd -8'
+alias 9='cd -9'
 
 # --- Git aliases ---
 alias g='git --no-pager'
