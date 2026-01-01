@@ -32,6 +32,7 @@ typeset -g HISTSIZE=200000  # max number of commands kept in memory per session
 typeset -g SAVEHIST=200000  # max number of commands saved to history file for persistence across sessions
 
 setopt HIST_IGNORE_ALL_DUPS        # remove older duplicates, keep the most recent
+setopt HIST_IGNORE_DUPS            # ignore immediate duplicate entries
 setopt HIST_IGNORE_SPACE           # commands starting with a space are not saved
 setopt HIST_REDUCE_BLANKS          # collapse extra whitespace before saving
 setopt HIST_VERIFY                 # show expanded history line before running
@@ -48,6 +49,18 @@ setopt NOCLOBBER                   # '>' won’t overwrite existing files
 setopt RM_STAR_WAIT                # prompt before 'rm *' if many files
 setopt NO_BEEP                     # disable terminal bell
 setopt EXTENDED_GLOB               # enable advanced globbing operators
+
+# ------------------------------- Other options --------------------------------
+
+setopt AUTO_CD                     # implicit `cd` when argument is a directory (e.g. .. and ../src)
+setopt AUTO_PUSHD                  # push old cwd onto dir stack on `cd`
+setopt PUSHD_IGNORE_DUPS           # avoid duplicate dir stack entries
+setopt PUSHD_MINUS                 # reverse meaning of +/- in dir stack
+setopt ALWAYS_TO_END               # move cursor to end after completion
+setopt COMPLETE_IN_WORD            # allow completion inside words
+setopt INTERACTIVE_COMMENTS        # allow `#` comments interactively
+setopt LONG_LIST_JOBS              # use long format for `jobs`
+setopt NO_FLOW_CONTROL             # disable ^S/^Q terminal flow control
 
 # ---------------------------- Autoload functions ------------------------------
 
