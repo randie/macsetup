@@ -167,7 +167,6 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias rm='rm -i'
 alias lsa='ls -a'
-alias h='history'
 alias d='dirs -v'
 alias dirs='dirs -v'
 alias ss='save -s'
@@ -189,7 +188,14 @@ alias 7='cd -7'
 alias 8='cd -8'
 alias 9='cd -9'
 
-# --- Git aliases ---
+# --- history aliases ---
+alias history='my_history'      # my_history is an autoloaded function
+alias h='history'
+alias hl='history | less'
+alias hg='history | grep'
+alias hgi='history | grep -i' 
+
+# --- git aliases ---
 alias g='git --no-pager'
 alias gs='g status -s'
 alias ga='g add'
@@ -220,4 +226,3 @@ alias cls='c ls-tree --full-tree -r --name-only HEAD'
 _p10k_zsh="$XDG_CONFIG_HOME/zsh/p10k/.p10k.zsh"
 [[ -f "$_p10k_zsh" ]] && source "$_p10k_zsh"
 unset _p10k_zsh
-
