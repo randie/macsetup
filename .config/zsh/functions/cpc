@@ -1,0 +1,52 @@
+# cpc — copy to cloud, i.e. copy files and directories to iCloud
+#
+# Usage:
+#   cpc <file-or-dir> [...]
+#
+# Copies one or more files and/or directories into:
+#   ~/save-icloud/
+#
+# Requirements:
+# - ~/save-icloud must already exist
+#   (it is expected to be a symlink into iCloud Drive)
+# - If ~/save-icloud does not exist, cpc errors out
+#
+# Behavior:
+# - Accepts any number of arguments (≥1)
+# - Copies files with `cp -i`
+# - Copies directories recursively with `cp -iR`
+# - Preserves original names
+# - Errors if any source path does not exist
+#
+# Examples:
+#   cpc foo.txt
+#   cpc bin foo.md
+
+local dest="$HOME/save-icloud"
+local src
+
+if (( $# < 1 )); then
+  print -u2 "Usage: cpc <file-or-dir> [...]"
+  return 1
+fi
+
+if [[ ! -e "$dest" ]]; then
+  print -u2 "cpc: destination '$dest' does not exist"
+  return 1
+fi
+
+if [[ ! -d "$dest" ]]; then
+  print -u2 "cpc: destination '$dest' is not a directory"
+  return 1
+fi
+
+for src in "$@"; do
+  if [[ -f "$src" ]]; then
+    cp -i -- "$src" "$dest/" || return 1
+  elif [[ -d "$src" ]]; then
+    cp -iR -- "$src" "$dest/" || return 1
+  else
+    print -u2 "cpc: '$src' does not exist"
+    return 1
+  fi
+done
