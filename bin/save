@@ -1,62 +1,57 @@
 #!/usr/bin/env bash
 
 # Args:
-# -c      save to icloud
-# -s      append a timestamp suffix
-# -d arg  save to arg (directory)
-USAGE="Usage: ${0##*/} [-c] [-s] [-d <dest-dir>] <files-to-save>"
+# -c         save to icloud
+# -t         append a timestamp
+# -s suffix  append a suffix
+# -d dir     save to directory
+#
+# Note: -s takes precedence over -t if both are specified
 
-# process command line options
-while getopts ":csd:" opt
-do
-  case $opt in
-    c) DEST=save-icloud         ;;
-    s) SUFFIX=",$(date +%H%M)"  ;;
-    d) DESTDIR=${OPTARG}        ;;
-    *) 1>&2 echo $USAGE; exit 1 ;;
+USAGE="Usage: ${0##*/} [-c] [-t] [-s <suffix>] [-d <dest-dir>] <files-to-save>"
+
+while getopts ":cts:d:" opt; do
+  case "$opt" in
+    c) SAVEDIR="save-icloud" ;;
+    t) TIMESTAMP=",$(date +%H%M)" ;;
+    s) SUFFIX=",${OPTARG}" ;;
+    d) DESTDIR="${OPTARG}" ;;
+    :) echo "Option -$OPTARG requires an argument" >&2; echo "$USAGE" >&2; exit 1 ;;
+    \?) echo "Invalid option: -$OPTARG" >&2; echo "$USAGE" >&2; exit 1 ;;
   esac
 done
-shift $(( OPTIND-1 ))  # shift options away
+shift $((OPTIND - 1))
 
-# check for command line args (i.e. files to save)
-if (($# < 1))
-then
-  1>&2 echo $USAGE
-  exit 2
+if (($# < 1)); then
+  echo "$USAGE" >&2
+  exit 3
 fi
 
-# set destination directory
-[ -z $DEST ] && DEST=save
-[ -z $DESTDIR ] && DESTDIR=$(date +%y%m%d)
-[ -z $s ] && s=$HOME/$DEST/$DESTDIR
-[ -d $s ] || mkdir -p $s
+: "${SAVEDIR:=save}"
+: "${DESTDIR:=$(date +%y%m%d)}"
 
-# iterate over all command line args
-for i in $*
-do
-  b=$(basename $i)
+dest_root="$HOME/$SAVEDIR/$DESTDIR"
+mkdir -p "$dest_root" || exit 4
 
-  # if basename begins with a '.' (is a hidden file),
-  # then change the '.' to '_' to unhide it, e.g.
-  # .vimric --> _vimrc
-  [[ $b = .* ]] && b="_${b#.}"
+# set suffix to append to saved file/directory
+[[ -z $SUFFIX && -n $TIMESTAMP ]] && SUFFIX="$TIMESTAMP"
 
-  # destination file
-  t=$s/${b}${SUFFIX}
+# debug
+# printf 'Args:\n'; printf '  %q\n' "$@"
 
-  if [ -f $i ]
-  then
-    cp -i $i $t && echo $t
-  elif [ -d $i ]
-  then
-    #cpdir $i $t && echo $t
-    cp -iR $i $t && echo $t
+for src in "$@"; do
+  base=$(basename "$src")
+
+  [[ $base = .* ]] && base="_${base#.}"
+
+  dest_path="$dest_root/${base}${SUFFIX}"
+
+  if [[ -f $src ]]; then
+    cp -i -- "$src" "$dest_path" && echo "$dest_path"
+  elif [[ -d $src ]]; then
+    cp -iR -- "$src" "$dest_path" && echo "$dest_path"
   else
-    echo "ERROR: $i does not exist"
+    echo "ERROR: $src does not exist" >&2
   fi
 done
 
-# TODO:
-# 2. implement -l, follow symlinks, save the actual file not the symlink
-# 3. implement -d <dir>, save to destination directory <dir>
-# 4. implement -s <suffix>, tack on ",<suffix>" to the save filename
