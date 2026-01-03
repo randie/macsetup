@@ -83,6 +83,20 @@ readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
 readonly SCRATCH_DIR="$HOME/$MACSETUP-scratch"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
 
+# ----------------------------------- usage ------------------------------------
+
+usage() {
+  cat << 'EOF'
+Usage: macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
+
+Options:
+  -t, --test-mode Run in test mode (no changes to shared/system state)
+  -v, --verbose   Print extra diagnostic output
+  --no-color      Disable colorized output
+  -h, --help      Show this help and exit
+EOF
+}
+
 # ------------------------------ logging helpers -------------------------------
 
 log_info()    { printf "${COLOR_INFO}[info] %s${COLOR_RESET}\n" "$*"; }
@@ -90,18 +104,38 @@ log_warn()    { printf "${COLOR_WARN}[warn] %s${COLOR_RESET}\n" "$*"; }
 log_error()   { printf "${COLOR_ERROR}ERROR: %s${COLOR_RESET}\n" "$*" >&2; }
 log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s${COLOR_RESET}\n" "$*" || true; }
 
-# --------------------------- manual actions helpers ---------------------------
+# -------------------------------- args parsing --------------------------------
 
-add_manual_action() { MANUAL_ACTIONS+=("$1"); }
-
-print_manual_actions_summary() {
-  if ((${#MANUAL_ACTIONS[@]})); then
-    log_warn "Manual follow-up actions required:"
-    local action
-    for action in "${MANUAL_ACTIONS[@]}"; do
-      printf "  - %s\n" "$action"
-    done
-  fi
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -t | --test-mode)
+        TEST_MODE=true
+        shift
+        ;;
+      -v | --verbose)
+        VERBOSE=true
+        shift
+        ;;
+      --no-color)
+        NO_COLOR=true
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        log_error "Unknown option: $1"
+        usage
+        exit 64
+        ;;
+    esac
+  done
 }
 
 # -------------------------- pre- and post-conditions --------------------------
@@ -163,54 +197,6 @@ setup_colors() {
     COLOR_VERBOSE=$(tput setaf 7) # white (high-contrast)
     COLOR_RESET=$(tput sgr0)
   fi
-}
-
-# ----------------------------------- usage ------------------------------------
-
-usage() {
-  cat << 'EOF'
-Usage: macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
-
-Options:
-  -t, --test-mode Run in test mode (no changes to shared/system state)
-  -v, --verbose   Print extra diagnostic output
-  --no-color      Disable colorized output
-  -h, --help      Show this help and exit
-EOF
-}
-
-# -------------------------------- args parsing --------------------------------
-
-parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -t | --test-mode)
-        TEST_MODE=true
-        shift
-        ;;
-      -v | --verbose)
-        VERBOSE=true
-        shift
-        ;;
-      --no-color)
-        NO_COLOR=true
-        shift
-        ;;
-      -h | --help)
-        usage
-        exit 0
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        log_error "Unknown option: $1"
-        usage
-        exit 64
-        ;;
-    esac
-  done
 }
 
 # --------------------------- ensure homebrew exists ---------------------------
@@ -337,6 +323,20 @@ backup_existing_config() {(
     log_verbose "No existing tracked files to back up."
   fi
 );}
+
+# --------------------------- manual actions helpers ---------------------------
+
+add_manual_action() { MANUAL_ACTIONS+=("$1"); }
+
+print_manual_actions_summary() {
+  if ((${#MANUAL_ACTIONS[@]})); then
+    log_warn "Manual follow-up actions required:"
+    local action
+    for action in "${MANUAL_ACTIONS[@]}"; do
+      printf "  - %s\n" "$action"
+    done
+  fi
+}
 
 # ------------------------ apply my iterm2 configuration -----------------------
 
