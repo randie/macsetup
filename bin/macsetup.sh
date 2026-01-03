@@ -341,17 +341,31 @@ backup_existing_config() {(
 # ------------------------ apply my iterm2 configuration -----------------------
 
 apply_iterm2_config() {
-  # readonly variables (constants)
-  local -r ITERM2_CONFIG_DIR="$CONFIG_DIR/iterm2"; mkdir -p "$ITERM2_CONFIG_DIR"
+
+  # ----------------------------------------------------------------------------
+  # Configure iTerm2 to load (and save) its preferences/settings from:
+  #   ~/.config/iterm2/com.googlecode.iterm2.plist
+  #
+  # What this function does:
+  #   1) Ensures iTerm2 is installed (skips the config part in TEST_MODE).
+  #   2) Enforces custom prefs mode by setting:
+  #        - LoadPrefsFromCustomFolder = true
+  #        - PrefsCustomFolder = ~/.config/iterm2
+  #   3) Checks whether the custom prefs folder exists.
+  #   4) Checks whether the canonical plist exists in that folder.
+  #      - If missing, logs a warning and adds a manual action (import + Save Now).
+  #   5) Suppresses the non-critical iTerm2 warning about custom prefs not syncing.
+  #   6) Instructs relaunch if iTerm2 is running.
+  # ----------------------------------------------------------------------------
+
   local -r DOMAIN="com.googlecode.iterm2"
+  local -r ITERM2_CONFIG_DIR="$CONFIG_DIR/iterm2"
   local -r PLIST="$ITERM2_CONFIG_DIR/$DOMAIN.plist"
-  local -r PLIST_XML="$ITERM2_CONFIG_DIR/$DOMAIN.plist.xml"
-  local -r SYS_PLIST="$HOME/Library/Preferences/${DOMAIN}.plist"
 
   # Ensure iTerm2 is installed
   if [[ "$TEST_MODE" == true ]]; then
     if ! brew list --cask iterm2 > /dev/null 2>&1; then
-      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 config."
+      log_warn "[TEST MODE] iTerm2 is not installed. Skipping iTerm2 install and config in test mode."
       return 0
     fi
     log_verbose "iTerm2 is already installed."
@@ -366,79 +380,48 @@ apply_iterm2_config() {
     fi
   fi
 
-  # Pick a source plist in priority order
-  local plist_src=""
-  if [[ -f "$PLIST" ]]; then
-    plist_src="$PLIST"
-  elif [[ -f "$PLIST_XML" ]]; then
-    plist_src="$PLIST_XML"
-  elif [[ -f "$SYS_PLIST" ]]; then
-    log_warn "No $DOMAIN plist in $ITERM2_CONFIG_DIR. Falling back to $SYS_PLIST."
-    plist_src="$SYS_PLIST"
-  else
-    log_warn "No existing $DOMAIN settings found. iTerm2 will start with defaults."
-  fi
-
-  # Apply settings if available
-  if [[ -n "$plist_src" ]]; then
-    log_info "Applying $DOMAIN settings from: $plist_src"
-
-    if [[ "$plist_src" == "$PLIST_XML" ]]; then
-      # Fast path: the plist source is already in XML format, so importing it directly
-      defaults import "$DOMAIN" "$PLIST_XML" > /dev/null 2>&1 || log_warn "defaults import failed."
-    else
-      # Convert plist to XML because the defaults import command
-      # works more reliably with XML-format plists
-      local plist_xml_tmp
-      plist_xml_tmp="${SCRATCH_DIR}/${DOMAIN}.${NOW}${RANDOM}.xml"
-
-      if plutil -convert xml1 -o "$plist_xml_tmp" "$plist_src" > /dev/null 2>&1; then
-        defaults import "$DOMAIN" "$plist_xml_tmp" > /dev/null 2>&1 || log_warn "defaults import failed."
-
-        # Replace $PLIST_XML with $plist_xml_tmp if:
-        # 1) $PLIST_XML doesn't exist, or
-        # 2) $plist_xml_tmp is different from $PLIST_XML
-        if [[ ! -f "$PLIST_XML" ]] || ! cmp -s "$plist_xml_tmp" "$PLIST_XML"; then
-          if mv -f "$plist_xml_tmp" "$PLIST_XML" > /dev/null 2>&1; then
-            log_verbose "Updated $PLIST_XML"
-          else
-            log_warn "Failed to update $PLIST_XML"
-            [[ -f "$plist_xml_tmp" ]] && rm -f "$plist_xml_tmp"
-          fi
-        else
-          rm -f "$plist_xml_tmp"
-          log_verbose "No changes for $PLIST_XML; left as-is."
-        fi
-      else
-        log_warn "Failed to convert plist to XML; attempting import of plist directly."
-        defaults import "$DOMAIN" "$plist_src" > /dev/null 2>&1 || log_warn "defaults import of plist failed."
-
-        # Best-effort: refresh tracked XML copy from source
-        if [[ "$plist_src" != "$PLIST_XML" ]]; then
-          plutil -convert xml1 -o "$PLIST_XML" "$plist_src" > /dev/null 2>&1 || log_warn "Failed to refresh $PLIST_XML"
-        fi
-
-        # Clean up any leftover temp file if it was created before conversion failed
-        [[ -n "${plist_xml_tmp:-}" && -f "$plist_xml_tmp" ]] && rm -f "$plist_xml_tmp"
-      fi
-    fi
-
-    # Also stage a copy where iTerm2 reads/writes by default
-    # cp -f "$plist_src" "$SYS_PLIST" 2>/dev/null || true
-  fi
-
-  # Point iTerm2 at ITERM2_CONFIG_DIR for load/save of iterm2 settings
-  defaults write "$DOMAIN" PrefsCustomFolder -string "$ITERM2_CONFIG_DIR"
+  # Specify custom prefs mode and folder path.
   defaults write "$DOMAIN" LoadPrefsFromCustomFolder -bool true
+  defaults write "$DOMAIN" PrefsCustomFolder -string "$ITERM2_CONFIG_DIR"
 
-  # Suppress the nag dialog about custom prefs not syncing
+  # Suppress the nag dialog about custom prefs not syncing.
   defaults write "$DOMAIN" NoSyncNeverRemindPrefsChangesLostForFile -bool true
 
-  # Flush settings cache
-  killall -u "$USER" cfprefsd > /dev/null 2>&1 || true
+  # Confirm the custom prefs folder and plist exist.
+  if [[ -d "$ITERM2_CONFIG_DIR" ]]; then
+    if [[ -f "$PLIST" ]]; then
+      log_verbose "Found canonical iTerm2 prefs file: $PLIST"
+    else
+      log_warn "Canonical iTerm2 prefs file is missing: $PLIST"
+      log_warn "In external-prefs mode, iTerm2 will start with defaults until this file exists."
+      add_manual_action "Open iTerm2 → Settings → General → Preferences, confirm it is set to load prefs from: $ITERM2_CONFIG_DIR. If needed, import your .itermexport and click 'Save Now' to write $PLIST."
+    fi
+  else
+    log_warn "iTerm2 prefs folder does not exist: $ITERM2_CONFIG_DIR"
+    add_manual_action "Create $ITERM2_CONFIG_DIR and ensure $PLIST exists (e.g., open iTerm2, import your .itermexport, then click 'Save Now' to write $PLIST)."
+  fi
+
+  # Read back defaults intent flags as a non-authoritative sanity check.
+  # This verifies that the custom-prefs mode and folder path were written.
+  # Failure here does not necessarily indicate a problem, as the defaults
+  # domain may not be materialized until iTerm2 is launched.
+
+  local read_custom_folder=""
+  local read_load_from_folder=""
+
+  read_custom_folder="$(defaults read "$DOMAIN" PrefsCustomFolder 2>/dev/null || true)"
+  read_load_from_folder="$(defaults read "$DOMAIN" LoadPrefsFromCustomFolder 2>/dev/null || true)"
+
+  if [[ "$read_custom_folder" == "$ITERM2_CONFIG_DIR" && "$read_load_from_folder" == "1" ]]; then
+    log_verbose "Confirmed iTerm2 external prefs mode is enabled and points to: $ITERM2_CONFIG_DIR"
+  else
+    log_warn "Could not definitively confirm iTerm2 external prefs settings via defaults read."
+    log_warn "Expected: LoadPrefsFromCustomFolder=1 and PrefsCustomFolder=$ITERM2_CONFIG_DIR"
+    log_warn "Got:      LoadPrefsFromCustomFolder=${read_load_from_folder:-<unset>} PrefsCustomFolder=${read_custom_folder:-<unset>}"
+  fi
 
   log_info "iTerm2 is set to load & save settings from: $ITERM2_CONFIG_DIR"
-  log_info "Tracked XML plist updated (if possible): $PLIST_XML"
+  log_info "Canonical iTerm2 prefs file: $PLIST"
   add_manual_action "If iTerm2 is running, quit and relaunch it to apply the new iTerm2 settings."
 }
 
