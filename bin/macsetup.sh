@@ -36,7 +36,7 @@
 #   • Re-running converges to the same state (whatever is in the bare repo)
 #
 # Usage:
-#   macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
+#   macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h] [--name|-n <computer-name>]
 #
 # ------------------------------------------------------------------------------
 
@@ -63,6 +63,7 @@ COLOR_VERBOSE=""
 COLOR_RESET=""
 NO_COLOR=false
 
+COMPUTER_NAME=""
 VERBOSE=false
 TEST_MODE=false
 MANUAL_ACTIONS=()
@@ -87,6 +88,7 @@ usage() {
 Usage: macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 
 Options:
+  -n, --name <computer-name> Name this computer <computer-name>
   -t, --test-mode Run in test mode (no changes to shared/system state)
   -v, --verbose   Print extra diagnostic output
   --no-color      Disable colorized output
@@ -106,6 +108,15 @@ log_verbose() { [[ "$VERBOSE" == true ]] && printf "${COLOR_VERBOSE}[verbose] %s
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      -n | --name)
+        if [[ $# -lt 2 ]]; then
+          log_error "You forgot to specify a computer name for $1"
+          usage
+          exit "$EX_USAGE"
+        fi
+        COMPUTER_NAME="$2"
+        shift 2
+        ;;
       -t | --test-mode)
         TEST_MODE=true
         shift
@@ -237,6 +248,42 @@ ensure_homebrew() {
     log_error "Homebrew installation failed"
     exit 1
   fi
+}
+
+# ------------------------------- name computer --------------------------------
+
+name_computer() {
+  if [[ -n "$COMPUTER_NAME" && "$TEST_MODE" != true ]]; then
+    # Simple validation: letters, numbers, hyphens only
+    if [[ ! "$COMPUTER_NAME" =~ ^[A-Za-z0-9-]+$ ]]; then
+      log_error "Invalid computer name: '$COMPUTER_NAME'"
+      log_error "Allowed characters: letters, numbers, hyphens"
+      exit "$EX_USAGE"
+    fi
+
+    local current_computer_name current_local_host_name current_host_name
+    current_computer_name="$(scutil --get ComputerName)"
+    current_local_host_name="$(scutil --get LocalHostName)"
+    current_host_name="$(scutil --get HostName 2>/dev/null || printf '')"
+
+    if [[ "$current_computer_name" == "$COMPUTER_NAME" && \
+          "$current_local_host_name" == "$COMPUTER_NAME" && \
+          "$current_host_name" == "$COMPUTER_NAME" ]]; then
+      log_info "ComputerName, LocalHostName, and HostName already set to '$COMPUTER_NAME'; no change needed."
+    else
+      log_info "ComputerName was $current_computer_name"
+      log_info "LocalHostName was $current_local_host_name"
+      log_info "HostName was $current_host_name"
+
+      scutil --set ComputerName "$COMPUTER_NAME"
+      scutil --set LocalHostName "$COMPUTER_NAME"
+      scutil --set HostName "$COMPUTER_NAME"
+    fi
+  fi
+
+  log_info "ComputerName is $(scutil --get ComputerName)"
+  log_info "LocalHostName is $(scutil --get LocalHostName)"
+  log_info "HostName is $(scutil --get HostName 2>/dev/null || printf '')"
 }
 
 # --------------------------- brew install packages ----------------------------
@@ -474,6 +521,7 @@ apply_my_config() {
 
   # Check out dotfiles from the bare repo into $HOME
   if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
+    name_computer
     brew_install_packages
     apply_iterm2_config
     chsh_to_zsh
