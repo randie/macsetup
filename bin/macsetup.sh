@@ -38,13 +38,6 @@
 # Usage:
 #   macsetup.sh [--test-mode|-t] [--verbose|-v] [--no-color] [--help|-h]
 #
-# Exit codes:
-#   0  success
-#   1  generic failure
-#   3  brew bundle failed - Brewfile not found or unreadable
-#   4  brew bundle failed - brew bundle did not complete successfully
-#  64  usage error (unknown flag)
-#
 # ------------------------------------------------------------------------------
 
 # Fail-fast settings:
@@ -79,9 +72,13 @@ readonly MACSETUP="macsetup"
 # readonly GITHUB_REPO="git@github.com:randie/$MACSETUP.git"
 readonly BARE_REPO="$HOME/$MACSETUP-bare"
 readonly CONFIG_DIR="$HOME/.config"
-readonly BREWFILE="$CONFIG_DIR/brew/Brewfile"
 readonly SCRATCH_DIR="$HOME/$MACSETUP-scratch"; mkdir -p "$SCRATCH_DIR"
 readonly BACKUP_TAR="$SCRATCH_DIR/${MACSETUP}-backup-${NOW}.tar"
+
+# --- exit codes ---
+readonly EX_USAGE=64       # sysexits.h: command line usage error
+readonly EX_NOINPUT=66     # sysexits.h: cannot open input
+readonly EX_SOFTWARE=70    # sysexits.h: internal software error
 
 # ----------------------------------- usage ------------------------------------
 
@@ -132,7 +129,7 @@ parse_args() {
       *)
         log_error "Unknown option: $1"
         usage
-        exit 64
+        exit "$EX_USAGE"
         ;;
     esac
   done
@@ -245,20 +242,28 @@ ensure_homebrew() {
 # --------------------------- brew install packages ----------------------------
 
 brew_install_packages() {
-  if [[ ! -r "$BREWFILE" ]]; then
-    log_error "Brewfile not found or unreadable: $BREWFILE"
-    exit 3
+  local brewfile
+  brewfile="$CONFIG_DIR/brew/Brewfile_$(uname -m)"    # arch-specific Brewfile
+
+  if [[ ! -r "$brewfile" ]]; then
+    log_warn "$brewfile not found or not readable"
+    brewfile="$CONFIG_DIR/brew/Brewfile"              # generic Brewfile
+    if [[ ! -r "$brewfile" ]]; then
+      log_error "$brewfile not found or not readable either"
+      exit "$EX_NOINPUT"
+    fi
   fi
+
+  log_info "Brewfile: $brewfile"
 
   if [[ "$TEST_MODE" == true ]]; then
     log_warn "[TEST MODE] Skipping brew bundle in test mode."
     return 0
   fi
 
-  log_info "Installing packages from $BREWFILE"
-  if ! brew bundle --file="$BREWFILE"; then
+  if ! brew bundle --file="$brewfile"; then
     log_error "brew bundle did not complete successfully."
-    exit 4
+    exit "$EX_SOFTWARE"
   fi
 }
 
