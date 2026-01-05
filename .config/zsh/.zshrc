@@ -209,18 +209,21 @@ alias glol="g log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen
 alias glos='g log --graph --pretty="%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset" --stat'
 alias savepy='gs | grep py | grep " M" | cut -d " " -f3 | xargs save -s'
 
-# --- macsetup bare-repo aliases ---
-alias c='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
-alias cs='c status -s'
-alias ca='c add'
-alias ci='c commit --verbose'
-alias co='c checkout'
-alias cm='c merge --no-commit --no-ff'
-alias cpu='c push'
-alias clo='c log --oneline --decorate'
-alias clog='c log --oneline --decorate --graph'
-alias clol="c log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
-alias cls='c ls-tree --full-tree -r --name-only HEAD'
+# --- macsetup bare-repo aliases (gitb stands for git bare) ---
+alias gitb='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
+alias b='gitb'
+alias bs='gitb status'
+alias bss='gitb status -s'
+alias ba='gitb add'
+alias bci='gitb commit --verbose'
+alias bco='gitb checkout'
+alias bd='gitb diff'
+alias bm='gitb merge --no-commit --no-ff'
+alias bp='gitb push'
+alias blo='gitb log --oneline --decorate'
+alias blog='gitb log --oneline --decorate --graph'
+alias blol="gitb log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
+alias bls='gitb ls-tree --full-tree -r --name-only HEAD'
 
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
