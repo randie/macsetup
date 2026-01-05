@@ -279,18 +279,17 @@ name_computer() {
     current_local_host_name="$(scutil --get LocalHostName)"
     current_host_name="$(scutil --get HostName 2>/dev/null || printf '')"
 
-    if [[ "$current_computer_name" == "$COMPUTER_NAME" && \
-          "$current_local_host_name" == "$COMPUTER_NAME" && \
-          "$current_host_name" == "$COMPUTER_NAME" ]]; then
-      log_info "ComputerName, LocalHostName, and HostName already set to '$COMPUTER_NAME'; no change needed."
-    else
+    if [[ "$current_computer_name" != "$COMPUTER_NAME" ]]; then
       log_info "ComputerName was $current_computer_name"
-      log_info "LocalHostName was $current_local_host_name"
-      log_info "HostName was $current_host_name"
-
       scutil --set ComputerName "$COMPUTER_NAME"
+    fi
+    if [[ "$current_local_host_name" != "$COMPUTER_NAME" ]]; then
+      log_info "LocalHostName was $current_local_host_name"
       scutil --set LocalHostName "$COMPUTER_NAME"
-      scutil --set HostName "$COMPUTER_NAME"
+    fi
+    if [[ "$current_host_name" != "${COMPUTER_NAME}.local" ]]; then
+      log_info "HostName was $current_host_name"
+      scutil --set HostName "${COMPUTER_NAME}.local"
     fi
   fi
 
