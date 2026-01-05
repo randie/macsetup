@@ -222,6 +222,7 @@ alias bm='gitb merge --no-commit --no-ff'
 alias bp='gitb push'
 alias blo='gitb log --oneline --decorate'
 alias blog='gitb log --oneline --decorate --graph'
+alias bl='blog -10'
 alias blol="gitb log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
 alias bls='gitb ls-tree --full-tree -r --name-only HEAD'
 
