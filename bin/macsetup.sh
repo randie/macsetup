@@ -150,32 +150,45 @@ parse_args() {
 
 ensure_preconditions() {
   # 1) Running on macOS
-  if [[ "$(uname -s)" != "Darwin" ]]; then
-    log_error "This script targets macOS machines only. Detected $(uname -s)."
+  local os="$(uname -s)"
+  if [[ "$os" != "Darwin" ]]; then
+    log_error "This script targets macOS machines only. Detected $os."
     exit 1
   fi
 
   local fail=0
 
   # 2) Xcode Command Line Tools installed
-  if [[ ! -x /usr/bin/xcode-select ]] || ! /usr/bin/xcode-select -p >/dev/null 2>&1; then
-    log_error $'Xcode Command Line Tools are required.\nInstall: xcode-select --install'
+  if xcode-select -p >/dev/null 2>&1; then
+    log_verbose "Xcode Command Line Tools are installed"
+  else
+    log_error $'Xcode Command Line Tools are required before running ${0##*/}.\nInstall: xcode-select --install'
     fail=1
   fi
 
-  # 3) Tools needed by Homebrew are available
-  local -a required_tools=(git curl)
-  local -a missing_tools=()
-  local t
-  for t in "${required_tools[@]}"; do
-    command -v "$t" >/dev/null 2>&1 || missing_tools+=("$t")
-  done
-  if ((${#missing_tools[@]})); then
-    log_error "Missing tools: ${missing_tools[*]}"
+  # 3) Homebrew installed
+  if command -v brew >/dev/null 2>&1; then
+    log_verbose "Homebrew is installed at: $(brew --prefix)"
+    [[ -n "${HOMEBREW_PREFIX:-}" ]] || eval "$(brew shellenv)"
+  else
+    log_error $'Homebrew is required before running ${0##*/}.\nInstall: https://brew.sh'
     fail=1
   fi
 
-  # 4) HOME directory is writable
+  # TODO: Is this still needed? If not, remove. [RB 260105]
+  # # 4) Required base tools are available
+  # local -a required_tools=(git curl)
+  # local -a missing_tools=()
+  # local t
+  # for t in "${required_tools[@]}"; do
+  #   command -v "$t" >/dev/null 2>&1 || missing_tools+=("$t")
+  # done
+  # if ((${#missing_tools[@]})); then
+  #   log_error "Missing tools: ${missing_tools[*]}"
+  #   fail=1
+  # fi
+
+  # 5) HOME directory is writable
   if [[ ! -w "$HOME" ]]; then
     log_error "\$HOME ($HOME) is not writable"
     fail=1
@@ -569,7 +582,7 @@ pre_flight() {
   setup_colors
   ensure_preconditions
   ensure_bare_repo
-  ensure_homebrew
+# ensure_homebrew
   backup_existing_config
 }
 
