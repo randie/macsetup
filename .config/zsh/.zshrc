@@ -27,7 +27,7 @@ typeset -g KEYTIMEOUT=5
 
 # ------------------------------- History options ------------------------------
 
-typeset -g HISTFILE="$XDG_STATE_HOME/zsh/history"
+typeset -g HISTFILE="$zsh_histfile"  # zsh_histfile is defined in .config/zsh/.zshenv
 typeset -g HISTSIZE=200000  # max number of commands kept in memory per session
 typeset -g SAVEHIST=200000  # max number of commands saved to history file for persistence across sessions
 

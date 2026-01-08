@@ -27,19 +27,21 @@ set +o allexport
 
 # ------------------------------ history (XDG) ---------------------------------
 
-# NB: HISTFILE's parent directory must be created for all shells (login or non-login)
-# so it is intentionally not gated with `[[ -o login ]] && ...`
-: "${HISTFILE:=$XDG_STATE_HOME/zsh/history}"
-mkdir -p -- "${HISTFILE:h}" 2>/dev/null || true
-touch -- "$HISTFILE" 2>/dev/null || true
-chmod 600 -- "$HISTFILE" 2>/dev/null || true
+typeset -g zsh_histfile="$XDG_STATE_HOME/zsh/history"
+mkdir -p -- "${zsh_histfile:h}" 2>/dev/null || true
+touch -- "$zsh_histfile" 2>/dev/null || true
+chmod 600 -- "$zsh_histfile" 2>/dev/null || true
+# Note, zsh_histfile will be referenced downstream, in .config/zsh/.zshrc.
 
 # ------------------------------ zshinit logging -------------------------------
 
 # Log file for zsh initialization issues
 typeset -g ZSHINIT_LOG="$XDG_STATE_HOME/zsh/zshinit.log"
+mkdir -p -- "${ZSHINIT_LOG:h}" 2>/dev/null || true
+touch -- "$ZSHINIT_LOG" 2>/dev/null || true
+chmod 600 -- "$ZSHINIT_LOG" 2>/dev/null || true
 
-# Number of issues encountered during zsh initialization (used by P10K prompt)
+# Number of issues encountered during zsh initialization (used by P10K prompt in ~/.config/zsh/p10k/.p10k.zsh)
 typeset -gi ZSHINIT_NUM_ERRORS=0
 
 # ---
@@ -101,3 +103,4 @@ _zshinit_log() {
     print -u$fd -- "$*"
   fi
 }
+
