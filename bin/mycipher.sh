@@ -1,110 +1,123 @@
 #!/usr/bin/env bash
 # ------------------------------------------------------------------------------
-# mycipher.sh — Secure Encryption & Integrity Verification Utility
+# mycipher.sh — File/Directory Encryption & External SHA-256 Verification Utility
 # ------------------------------------------------------------------------------
 #
-# Usage: mycipher.sh {encrypt|decrypt|verify} [-p pass] [-o out] <file|directory>
+# Usage:
+#   mycipher.sh {encrypt|decrypt|verify} [-p password] [-o output_file] \
+#     [-v expected_hash] <file_or_directory>
 #
-# Commands: encrypt | verify | decrypt
+# Commands:
+#   encrypt   Encrypt a file or directory.
+#   decrypt   Decrypt an encrypted file. Optionally verify its SHA-256 first.
+#   verify    Compute SHA-256 for an encrypted file and optionally compare it
+#             with an expected hash that you stored separately.
 #
 # Workflow:
-#   1. encrypt: Run 'encrypt' on your target file or directory.
+#   1. Encrypt a target file or directory.
 #      ╰─❯ mycipher.sh encrypt my-file.pdf     # => x-my-file.pdf
 #      ╰─❯ mycipher.sh encrypt my-directory    # => x-my-directory
 #
-#   2. 1Password: MANUALLY copy the resulting SHA-256 hash and the encryption 
-#      password (from ~/.mycipher) into your 1Password entry for this
-#      encrypted file or directory.
+#   2. Manually copy the resulting SHA-256 hash and the encryption password
+#      into your 1Password entry for the encrypted file.
 #
-#   3. upload: Move the encrypted (x-*) file to your cloud storage.
+#   3. Upload the encrypted x-* file to cloud storage.
 #
-#   4. verify: (Every so often) Run 'verify' on your x-* files in the cloud to
-#      to see if any bit rot has corrupted your encrypted files. This will
-#      compare a newly generated hash with the one you saved in 1Password.
+#   4. Periodically verify the encrypted file to detect corruption or bit rot by
+#      comparing its current SHA-256 with the hash you saved separately.
 #      ╰─❯ mycipher.sh verify -v <hash-from-1password> x-my-directory
 #
-#   5. decrypt: Download a copy of an encrypted file/directory, and run
-#      'decrypt -v <hash>' on it.
+#   5. Download an encrypted file and decrypt it. If you provide -v <hash>,
+#      the script verifies the encrypted file before decrypting it.
 #      ╰─❯ mycipher.sh decrypt -v <hash-from-1password> x-my-directory
 #
-# How it works:
-#   1. Password Logic: 
-#      - Uses -p <password> if provided (wrap complex strings in single quotes '').
-#      - else, reads the first line of ~/.mycipher as the password
-#      - else, prompts via secure hidden terminal input
+# Password resolution:
+#   1. Uses -p <password> if provided.
+#   2. Else reads the first line of ~/.mycipher exactly as stored.
+#   3. Else prompts via hidden terminal input.
 #
-#   2. Encryption Engine: (uses /opt/homebrew/bin/openssl)
-#      - Algorithm: AES-256-CBC (for Maximum Portability).
-#      - Key Derivation: PBKDF2 with a random 8-byte salt (stored in header).
-#      - Integrity: External verification via SHA-256 hashing.
-#
-#   3. Logic Flow: 
-#      - Directories: Automatically streamed through 'tar' before encryption.
-#      - Files: Encrypted directly as binary blobs.
-#      - Decryption: Uses 'file' utility to detect tar headers in the resulting
-#        plaintext, triggering automatic extraction if a directory is found.
-#
+# Implementation notes:
+#   - OpenSSL binary: /opt/homebrew/bin/openssl
+#   - Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
+#     output format.
+#   - Directories are tar-streamed before encryption.
+#   - Decryption uses the 'file' utility to heuristically detect whether the
+#     plaintext is a tar archive and extracts it if so.
+#   - Integrity verification is external: SHA-256 is computed over the encrypted
+#     file and compared with a separately stored expected hash.
 # ------------------------------------------------------------------------------
+
+set -o pipefail
 
 # --- Global Configuration & State ---
 
 readonly OPENSSL="/opt/homebrew/bin/openssl"
 readonly PW_FILE="$HOME/.mycipher"
 
-CMD=""          # 'encrypt', 'decrypt', or 'verify'
-OPT_PASS=""     # Password from -p flag
-OPT_OUT=""      # Output filename from -o flag
-OPT_HASH=""     # Expected hash for verification (-v)
-TARGET=""          # The target file or directory parameter
-PASSWORD=""     # The final resolved password string
+CMD=""          # encrypt | decrypt | verify
+OPT_PASS=""     # Password from -p
+OPT_OUT=""      # Output filename from -o
+OPT_HASH=""     # Expected hash from -v
+TARGET=""       # Target file or directory
+PASSWORD=""     # Resolved password string
 
 # --- Helper Functions ---
 
 usage() {
-    echo "Usage: $0 {encrypt|decrypt|verify} [-p password] [-o output_file] [-v expected_hash] <parameter>"
+    printf '%s\n' \
+        "Usage: $0 {encrypt|decrypt|verify} [-p password] [-o output_file] [-v expected_hash] <file_or_directory>"
     exit 1
 }
 
 validate_target() {
     local target=$1
+
     if [[ -z "$target" ]]; then
-        echo "Error: No file or directory specified."
+        printf "Error: No file or directory specified.\n" >&2
         usage
     fi
+
     if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist."
+        printf "Error: Target '%s' does not exist.\n" "$target" >&2
         exit 1
     fi
 }
 
 get_password() {
     local pass_arg=$1
+    local file_pass=""
+    local manual_pass=""
+
     if [[ -n "$pass_arg" ]]; then
-        echo "$pass_arg"
+        printf '%s' "$pass_arg"
     elif [[ -f "$PW_FILE" ]]; then
-        head -n 1 "$PW_FILE" | xargs
+        IFS= read -r file_pass < "$PW_FILE"
+        printf '%s' "$file_pass"
     else
-        read -rs -p "Enter password: " manual_pass
-        echo "$manual_pass" >&2
-        echo "$manual_pass"
+        read -r -s -p "Enter password: " manual_pass
+        printf '\n' >&2
+        printf '%s' "$manual_pass"
     fi
 }
 
 parse_command_line() {
-    CMD=$1
+    OPTIND=1
+
+    CMD=${1:-}
+    [[ -n "$CMD" ]] || usage
     shift || usage
-    
+
     while getopts "p:o:v:" opt; do
-        case $opt in
+        case "$opt" in
             p) OPT_PASS=$OPTARG ;;
             o) OPT_OUT=$OPTARG ;;
             v) OPT_HASH=$OPTARG ;;
             *) usage ;;
         esac
     done
-    shift $((OPTIND-1))
-    
-    TARGET=$1
+    shift $((OPTIND - 1))
+
+    TARGET=${1:-}
 }
 
 # --- Core Logic Functions ---
@@ -112,34 +125,38 @@ parse_command_line() {
 verify_target() {
     local target=$1
     local expected=$2
+    local actual=""
 
     if [[ ! -f "$target" ]]; then
-        echo "Error: Cannot verify. '$target' is not a file."
+        printf "Error: Cannot verify. '%s' is not a file.\n" "$target" >&2
         return 1
     fi
 
-    local actual=$($OPENSSL dgst -sha256 "$target" | awk '{print $NF}')
+    actual=$("$OPENSSL" dgst -sha256 "$target" | awk '{print $NF}')
 
-    echo "--- Integrity Report for: $target ---"
-    
+    printf -- "--- Integrity Report for: %s ---\n" "$target"
+
     if [[ -n "$expected" ]]; then
         if [[ "$actual" == "$expected" ]]; then
-            echo "SUCCESS: Integrity confirmed. Hash matches."
-            echo "---------------------------------------"
+            printf '%s\n' \
+                "SUCCESS: Integrity confirmed. Hash matches." \
+                "---------------------------------------"
             return 0
-        else
-            echo "ACTUAL:   $actual"
-            echo "EXPECTED: $expected"
-            echo "---------------------------------------"
-            echo "FAILURE: HASH MISMATCH! The file may be corrupted."
-            return 1
         fi
-    else
-        echo "SHA-256: $actual"
-        echo "---------------------------------------"
-        echo "ACTION: MANUALLY copy this hash into 1Password."
-        return 0
+
+        printf '%s\n' \
+            "ACTUAL:   $actual" \
+            "EXPECTED: $expected" \
+            "---------------------------------------" \
+            "FAILURE: HASH MISMATCH! The file may be corrupted."
+        return 1
     fi
+
+    printf '%s\n' \
+        "SHA-256: $actual" \
+        "---------------------------------------" \
+        "ACTION: MANUALLY copy this hash into 1Password."
+    return 0
 }
 
 encrypt_target() {
@@ -148,16 +165,16 @@ encrypt_target() {
     local pass=$3
 
     if [[ -d "$target" ]]; then
-        tar -cf - "$target" | $OPENSSL enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -out "$output"
+        tar -cf - "$target" | "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -out "$output"
     else
-        $OPENSSL enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$output"
+        "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$output"
     fi
 
     if [[ $? -eq 0 ]]; then
-        echo "Encryption complete: $output"
+        printf "Encryption complete: %s\n" "$output"
         verify_target "$output" ""
     else
-        echo "Error: Encryption failed."
+        printf '%s\n' "Error: Encryption failed." >&2
         exit 1
     fi
 }
@@ -166,47 +183,51 @@ decrypt_target() {
     local target=$1
     local output=$2
     local pass=$3
-    local temp_out="$output.tmp"
+    local temp_out="${output}.tmp"
+    local err_msg=""
 
     if [[ -d "$target" ]]; then
-        echo "Error: '$target' is a directory."
+        printf "Error: '%s' is a directory.\n" "$target" >&2
         exit 1
     fi
 
-    trap "rm -f $temp_out" EXIT
+    trap 'rm -f -- "$temp_out"' EXIT
 
-    ERR_MSG=$($OPENSSL enc -aes-256-cbc -d -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$temp_out" 2>&1)
-    
+    err_msg=$("$OPENSSL" enc -aes-256-cbc -d -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$temp_out" 2>&1)
+
     if [[ $? -ne 0 ]]; then
-        if [[ "$ERR_MSG" == *"bad decrypt"* ]]; then
-            echo "Error: Decryption failed. Incorrect password."
-        elif [[ "$ERR_MSG" == *"bad magic number"* ]]; then
-            echo "Error: '$target' is not a valid encrypted file."
+        if [[ "$err_msg" == *"bad decrypt"* ]]; then
+            printf '%s\n' "Error: Decryption failed. Incorrect password." >&2
+        elif [[ "$err_msg" == *"bad magic number"* ]]; then
+            printf "Error: '%s' is not a valid encrypted file.\n" "$target" >&2
         else
-            echo "Error: $ERR_MSG"
+            printf "Error: %s\n" "$err_msg" >&2
         fi
         exit 1
     fi
 
     if file "$temp_out" | grep -q "tar archive"; then
         tar -xf "$temp_out" -C ./
-        echo "Directory decrypted and extracted."
+        rm -f -- "$temp_out"
+        printf '%s\n' "Directory decrypted and extracted."
     else
-        mv "$temp_out" "$output"
-        echo "File decrypted: $output"
+        mv -- "$temp_out" "$output"
+        printf "File decrypted: %s\n" "$output"
     fi
+
+    trap - EXIT
 }
 
 #=======================#
 #                       #
 #    M A I N L I N E    #
 #                       #
-#=======================#  
+#=======================#
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     parse_command_line "$@"
     validate_target "$TARGET"
-    
+
     CLEAN_TARGET="${TARGET%/}"
     BASE_NAME=$(basename "$CLEAN_TARGET")
 
@@ -220,24 +241,28 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
             ;;
         decrypt)
-            # Integrity Check Guard Rail
             if [[ -n "$OPT_HASH" ]]; then
                 verify_target "$TARGET" "$OPT_HASH"
                 if [[ $? -ne 0 ]]; then
-                    echo "Aborting decryption due to integrity failure."
+                    printf '%s\n' "Aborting decryption due to integrity failure." >&2
                     exit 1
                 fi
             fi
 
             PASSWORD=$(get_password "$OPT_PASS")
             if [[ -z "$OPT_OUT" ]]; then
-                [[ "$BASE_NAME" == x-* ]] && OPT_OUT="${BASE_NAME#x-}" || OPT_OUT="decrypted-$BASE_NAME"
+                if [[ "$BASE_NAME" == x-* ]]; then
+                    OPT_OUT="${BASE_NAME#x-}"
+                else
+                    OPT_OUT="decrypted-$BASE_NAME"
+                fi
             fi
             decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
             ;;
         *)
-            echo "Error: Unknown command '$CMD'"
+            printf "Error: Unknown command '%s'\n" "$CMD" >&2
             usage
             ;;
     esac
 fi
+
