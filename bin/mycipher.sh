@@ -234,6 +234,56 @@ decrypt_target() {
     trap - EXIT
 }
 
+run_verify() {
+    validate_target "$TARGET"
+    verify_target "$TARGET" "$EXPECTED_HASH"
+}
+
+run_encrypt() {
+    local clean_target=""
+    local base_name=""
+
+    validate_target "$TARGET"
+
+    clean_target="${TARGET%/}"
+    base_name=$(basename "$clean_target")
+
+    PASSWORD=$(get_password "$OPT_PASS")
+    [[ -z "$OPT_OUT" ]] && OPT_OUT="./x-$base_name"
+
+    encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
+}
+
+run_decrypt() {
+    local clean_target=""
+    local base_name=""
+
+    validate_target "$TARGET"
+
+    if [[ -n "$EXPECTED_HASH" ]]; then
+        verify_target "$TARGET" "$EXPECTED_HASH"
+        if [[ $? -ne 0 ]]; then
+            printf '%s\n' "Aborting decryption due to integrity failure." >&2
+            exit 1
+        fi
+    fi
+
+    clean_target="${TARGET%/}"
+    base_name=$(basename "$clean_target")
+
+    PASSWORD=$(get_password "$OPT_PASS")
+
+    if [[ -z "$OPT_OUT" ]]; then
+        if [[ "$base_name" == x-* ]]; then
+            OPT_OUT="${base_name#x-}"
+        else
+            OPT_OUT="decrypted-$base_name"
+        fi
+    fi
+
+    decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
+}
+
 #=======================#
 #                       #
 #    M A I N L I N E    #
@@ -242,43 +292,11 @@ decrypt_target() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     parse_command_line "$@"
-    validate_target "$TARGET"
-
-    CLEAN_TARGET="${TARGET%/}"
-    BASE_NAME=$(basename "$CLEAN_TARGET")
-
     case "$CMD" in
-        verify)
-            verify_target "$TARGET" "$EXPECTED_HASH"
-            ;;
-        encrypt)
-            PASSWORD=$(get_password "$OPT_PASS")
-            [[ -z "$OPT_OUT" ]] && OPT_OUT="./x-$BASE_NAME"
-            encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
-            ;;
-        decrypt)
-            if [[ -n "$EXPECTED_HASH" ]]; then
-                verify_target "$TARGET" "$EXPECTED_HASH"
-                if [[ $? -ne 0 ]]; then
-                    printf '%s\n' "Aborting decryption due to integrity failure." >&2
-                    exit 1
-                fi
-            fi
-
-            PASSWORD=$(get_password "$OPT_PASS")
-            if [[ -z "$OPT_OUT" ]]; then
-                if [[ "$BASE_NAME" == x-* ]]; then
-                    OPT_OUT="${BASE_NAME#x-}"
-                else
-                    OPT_OUT="decrypted-$BASE_NAME"
-                fi
-            fi
-            decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
-            ;;
-        *)
-            printf "Error: Unknown command '%s'\n" "$CMD" >&2
-            usage
-            ;;
+        verify)  run_verify  ;;
+        encrypt) run_encrypt ;;
+        decrypt) run_decrypt ;;
+        *) printf "Error: Unknown command '%s'\n" "$CMD" >&2; usage ;;
     esac
 fi
 
