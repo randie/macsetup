@@ -59,7 +59,8 @@ CMD=""            # encrypt | decrypt | verify
 OPT_PASS=""       # Password from -p
 OPT_OUT=""        # Output filename from -o
 EXPECTED_HASH=""  # Expected hash from -v or verify positional arg
-TARGET=""         # Target file or directory
+TARGET=""         # Target path, normalized to remove any trailing slash
+BASE_NAME=""      # Basename derived from TARGET
 PASSWORD=""       # Resolved password string
 
 # --- Helper Functions ---
@@ -74,17 +75,22 @@ usage() {
 }
 
 validate_target() {
-    local target=$1
-
-    if [[ -z "$target" ]]; then
+    if [[ -z "$TARGET" ]]; then
         printf "Error: No file or directory specified.\n" >&2
         usage
     fi
 
-    if [[ ! -e "$target" ]]; then
-        printf "Error: Target '%s' does not exist.\n" "$target" >&2
+    [[ "$TARGET" != "/" ]] && TARGET="${TARGET%/}"
+
+    if [[ ! -e "$TARGET" ]]; then
+        printf "Error: Target '%s' does not exist.\n" "$TARGET" >&2
         exit 1
     fi
+}
+
+prepare_target() {
+    validate_target
+    BASE_NAME=$(basename "$TARGET")
 }
 
 get_password() {
@@ -235,30 +241,19 @@ decrypt_target() {
 }
 
 run_verify() {
-    validate_target "$TARGET"
+    prepare_target
     verify_target "$TARGET" "$EXPECTED_HASH"
 }
 
 run_encrypt() {
-    local clean_target=""
-    local base_name=""
-
-    validate_target "$TARGET"
-
-    clean_target="${TARGET%/}"
-    base_name=$(basename "$clean_target")
-
+    prepare_target
     PASSWORD=$(get_password "$OPT_PASS")
-    [[ -z "$OPT_OUT" ]] && OPT_OUT="./x-$base_name"
-
+    [[ -z "$OPT_OUT" ]] && OPT_OUT="./x-$BASE_NAME"
     encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
 }
 
 run_decrypt() {
-    local clean_target=""
-    local base_name=""
-
-    validate_target "$TARGET"
+    prepare_target
 
     if [[ -n "$EXPECTED_HASH" ]]; then
         verify_target "$TARGET" "$EXPECTED_HASH"
@@ -268,16 +263,13 @@ run_decrypt() {
         fi
     fi
 
-    clean_target="${TARGET%/}"
-    base_name=$(basename "$clean_target")
-
     PASSWORD=$(get_password "$OPT_PASS")
 
     if [[ -z "$OPT_OUT" ]]; then
-        if [[ "$base_name" == x-* ]]; then
-            OPT_OUT="${base_name#x-}"
+        if [[ "$BASE_NAME" == x-* ]]; then
+            OPT_OUT="${BASE_NAME#x-}"
         else
-            OPT_OUT="decrypted-$base_name"
+            OPT_OUT="decrypted-$BASE_NAME"
         fi
     fi
 
