@@ -4,14 +4,15 @@
 # ------------------------------------------------------------------------------
 #
 # Usage:
-#   mycipher.sh {encrypt|decrypt|verify} [-p password] [-o output_file] \
-#     [-v expected_hash] <file_or_directory>
+#   mycipher.sh encrypt [-p password] [-o output_file] <file_or_directory>
+#   mycipher.sh decrypt [-p password] [-o output_file] [-v expected_hash] <file_or_directory>
+#   mycipher.sh verify <file_or_directory> <expected_hash>
 #
 # Commands:
 #   encrypt   Encrypt a file or directory.
 #   decrypt   Decrypt an encrypted file. Optionally verify its SHA-256 first.
-#   verify    Compute SHA-256 for an encrypted file and optionally compare it
-#             with an expected hash that you stored separately.
+#   verify    Compute SHA-256 for an encrypted file and compare it with the
+#             expected hash you stored separately.
 #
 # Workflow:
 #   1. Encrypt a target file or directory.
@@ -25,7 +26,7 @@
 #
 #   4. Periodically verify the encrypted file to detect corruption or bit rot by
 #      comparing its current SHA-256 with the hash you saved separately.
-#      ╰─❯ mycipher.sh verify -v <hash-from-1password> x-my-directory
+#      ╰─❯ mycipher.sh verify x-my-directory <hash-from-1password>
 #
 #   5. Download an encrypted file and decrypt it. If you provide -v <hash>,
 #      the script verifies the encrypted file before decrypting it.
@@ -54,18 +55,21 @@ set -o pipefail
 readonly OPENSSL="/opt/homebrew/bin/openssl"
 readonly PW_FILE="$HOME/.mycipher"
 
-CMD=""          # encrypt | decrypt | verify
-OPT_PASS=""     # Password from -p
-OPT_OUT=""      # Output filename from -o
-OPT_HASH=""     # Expected hash from -v
-TARGET=""       # Target file or directory
-PASSWORD=""     # Resolved password string
+CMD=""            # encrypt | decrypt | verify
+OPT_PASS=""       # Password from -p
+OPT_OUT=""        # Output filename from -o
+EXPECTED_HASH=""  # Expected hash from -v or verify positional arg
+TARGET=""         # Target file or directory
+PASSWORD=""       # Resolved password string
 
 # --- Helper Functions ---
 
 usage() {
     printf '%s\n' \
-        "Usage: $0 {encrypt|decrypt|verify} [-p password] [-o output_file] [-v expected_hash] <file_or_directory>"
+        "Usage:" \
+        "  $0 encrypt [-p password] [-o output_file] <file_or_directory>" \
+        "  $0 decrypt [-p password] [-o output_file] [-v expected_hash] <file_or_directory>" \
+        "  $0 verify <file_or_directory> <expected_hash>"
     exit 1
 }
 
@@ -107,17 +111,36 @@ parse_command_line() {
     [[ -n "$CMD" ]] || usage
     shift || usage
 
-    while getopts "p:o:v:" opt; do
-        case "$opt" in
-            p) OPT_PASS=$OPTARG ;;
-            o) OPT_OUT=$OPTARG ;;
-            v) OPT_HASH=$OPTARG ;;
-            *) usage ;;
-        esac
-    done
-    shift $((OPTIND - 1))
+    case "$CMD" in
+        verify)
+            TARGET=${1:-}
+            EXPECTED_HASH=${2:-}
 
-    TARGET=${1:-}
+            [[ -n "$TARGET" ]] || usage
+            [[ -n "$EXPECTED_HASH" ]] || {
+                printf "Error: verify requires both <file_or_directory> and <expected_hash>.\n" >&2
+                usage
+            }
+
+            [[ $# -eq 2 ]] || usage
+            ;;
+        encrypt|decrypt)
+            while getopts "p:o:v:" opt; do
+                case "$opt" in
+                    p) OPT_PASS=$OPTARG ;;
+                    o) OPT_OUT=$OPTARG ;;
+                    v) EXPECTED_HASH=$OPTARG ;;
+                    *) usage ;;
+                esac
+            done
+            shift $((OPTIND - 1))
+
+            TARGET=${1:-}
+            ;;
+        *)
+            usage
+            ;;
+    esac
 }
 
 # --- Core Logic Functions ---
@@ -136,27 +159,19 @@ verify_target() {
 
     printf -- "--- Integrity Report for: %s ---\n" "$target"
 
-    if [[ -n "$expected" ]]; then
-        if [[ "$actual" == "$expected" ]]; then
-            printf '%s\n' \
-                "SUCCESS: Integrity confirmed. Hash matches." \
-                "---------------------------------------"
-            return 0
-        fi
-
+    if [[ "$actual" == "$expected" ]]; then
         printf '%s\n' \
-            "ACTUAL:   $actual" \
-            "EXPECTED: $expected" \
-            "---------------------------------------" \
-            "FAILURE: HASH MISMATCH! The file may be corrupted."
-        return 1
+            "SUCCESS: Integrity confirmed. Hash matches." \
+            "---------------------------------------"
+        return 0
     fi
 
     printf '%s\n' \
-        "SHA-256: $actual" \
+        "ACTUAL:   $actual" \
+        "EXPECTED: $expected" \
         "---------------------------------------" \
-        "ACTION: MANUALLY copy this hash into 1Password."
-    return 0
+        "FAILURE: HASH MISMATCH! The file may be corrupted."
+    return 1
 }
 
 encrypt_target() {
@@ -172,7 +187,8 @@ encrypt_target() {
 
     if [[ $? -eq 0 ]]; then
         printf "Encryption complete: %s\n" "$output"
-        verify_target "$output" ""
+        "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
+        printf '%s\n' "ACTION: MANUALLY copy this hash into 1Password."
     else
         printf '%s\n' "Error: Encryption failed." >&2
         exit 1
@@ -233,7 +249,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
     case "$CMD" in
         verify)
-            verify_target "$TARGET" "$OPT_HASH"
+            verify_target "$TARGET" "$EXPECTED_HASH"
             ;;
         encrypt)
             PASSWORD=$(get_password "$OPT_PASS")
@@ -241,8 +257,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
             ;;
         decrypt)
-            if [[ -n "$OPT_HASH" ]]; then
-                verify_target "$TARGET" "$OPT_HASH"
+            if [[ -n "$EXPECTED_HASH" ]]; then
+                verify_target "$TARGET" "$EXPECTED_HASH"
                 if [[ $? -ne 0 ]]; then
                     printf '%s\n' "Aborting decryption due to integrity failure." >&2
                     exit 1
