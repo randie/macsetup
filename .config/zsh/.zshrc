@@ -168,7 +168,7 @@ alias mv='mv -i'
 alias rm='rm -i'
 alias la='ls -a'
 alias l1='ls -1'
-alias l1a='ls -1a'
+alias la1='ls -a1'
 alias ll='ls -l'
 alias lla='ls -la'
 alias d='dirs -v'
@@ -230,6 +230,13 @@ alias blog='gitb log --oneline --decorate --graph'
 alias bl='blog -10'
 alias blol="gitb log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
 alias bls='gitb ls-tree --full-tree -r --name-only HEAD'
+alias bt='(cd ~ && gitb ls-files)'
+
+# --- mycipher.sh aliases ---
+alias mycipher='~/bin/mycipher.sh'
+alias enc='~/bin/mycipher.sh encrypt'
+alias dec='~/bin/mycipher.sh decrypt'
+alias decv='~/bin/mycipher.sh decrypt -v'
 
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
