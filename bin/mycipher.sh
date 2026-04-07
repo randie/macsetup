@@ -5,8 +5,8 @@
 #
 # Usage:
 #   mycipher.sh encrypt [-p password] [-o output_file] <file_or_directory>
-#   mycipher.sh decrypt [-p password] [-o output_file] [-v expected_hash] <file_or_directory>
-#   mycipher.sh verify <file_or_directory> <expected_hash>
+#   mycipher.sh decrypt [-p password] [-o output_file] [-v expected_hash] <encrypted_file>
+#   mycipher.sh verify <encrypted_file> <expected_hash>
 #
 # Commands:
 #   encrypt   Encrypt a file or directory.
@@ -69,8 +69,8 @@ usage() {
     printf '%s\n' \
         "Usage:" \
         "  $0 encrypt [-p password] [-o output_file] <file_or_directory>" \
-        "  $0 decrypt [-p password] [-o output_file] [-v expected_hash] <file_or_directory>" \
-        "  $0 verify <file_or_directory> <expected_hash>"
+        "  $0 decrypt [-p password] [-o output_file] [-v expected_hash] <encrypted_file>" \
+        "  $0 verify <encrypted_file> <expected_hash>"
     exit 1
 }
 
@@ -119,18 +119,36 @@ parse_command_line() {
 
     case "$CMD" in
         verify)
+            if [[ ${1:-} == -* || ${2:-} == -* ]]; then
+                printf '%s\n' "Error: verify does not accept options. Use: $0 verify <encrypted_file> <expected_hash>" >&2
+                usage
+            fi
+
             TARGET=${1:-}
             EXPECTED_HASH=${2:-}
 
             [[ -n "$TARGET" ]] || usage
             [[ -n "$EXPECTED_HASH" ]] || {
-                printf "Error: verify requires both <file_or_directory> and <expected_hash>.\n" >&2
+                printf "Error: verify requires both <encrypted_file> and <expected_hash>.\n" >&2
                 usage
             }
 
             [[ $# -eq 2 ]] || usage
             ;;
-        encrypt|decrypt)
+        encrypt)
+            while getopts "p:o:" opt; do
+                case "$opt" in
+                    p) OPT_PASS=$OPTARG ;;
+                    o) OPT_OUT=$OPTARG ;;
+                    *) usage ;;
+                esac
+            done
+            shift $((OPTIND - 1))
+
+            [[ $# -eq 1 ]] || usage
+            TARGET=$1
+            ;;
+        decrypt)
             while getopts "p:o:v:" opt; do
                 case "$opt" in
                     p) OPT_PASS=$OPTARG ;;
@@ -141,7 +159,8 @@ parse_command_line() {
             done
             shift $((OPTIND - 1))
 
-            TARGET=${1:-}
+            [[ $# -eq 1 ]] || usage
+            TARGET=$1
             ;;
         *)
             usage
