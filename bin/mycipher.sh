@@ -22,7 +22,7 @@
 #   2. Manually copy the resulting SHA-256 hash and the encryption password
 #      into your 1Password entry for the encrypted file.
 #
-#   3. Upload the encrypted x-* file to cloud storage.
+#   3. Upload the encrypted output file to cloud storage.
 #
 #   4. Periodically verify the encrypted file to detect corruption or bit rot by
 #      comparing its current SHA-256 with the hash you saved separately.
@@ -105,7 +105,7 @@ validate_target() {
 
 prepare_target() {
     validate_target
-    BASE_NAME=$(basename "$TARGET")
+    BASE_NAME="${TARGET##*/}"
 }
 
 get_password() {
@@ -126,8 +126,10 @@ get_password() {
 }
 
 parse_verify_args() {
+    local script_name="${0##*/}"
+
     if [[ ${1:-} == -* || ${2:-} == -* ]]; then
-        printf '%s\n' "Error: verify does not accept options. Use: $0 verify <encrypted_file> <expected_hash>" >&2
+        printf '%s\n' "Error: verify does not accept options. Use: $script_name verify <encrypted_file> <expected_hash>" >&2
         usage
     fi
 
@@ -297,8 +299,8 @@ run_encrypt() {
 
     PASSWORD=$(get_password "$OPT_PASSWORD")
 
-    if [[ -n "$OUTPUT" && ! -d "$TARGET" && "$(basename "$OUTPUT")" == *"$SUFFIX" ]]; then
-        printf "Error: Custom encrypted output name '%s' must not end with reserved suffix '%s' for files.\n" "$(basename "$OUTPUT")" "$SUFFIX" >&2
+    if [[ -n "$OUTPUT" && ! -d "$TARGET" && "${OUTPUT##*/}" == *"$SUFFIX" ]]; then
+        printf "Error: Custom encrypted output name '%s' must not end with reserved suffix '%s' for files.\n" "${OUTPUT##*/}" "$SUFFIX" >&2
         exit 1
     fi
 
