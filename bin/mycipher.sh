@@ -17,7 +17,7 @@
 # Workflow:
 #   1. Encrypt a target file or directory.
 #      ╰─❯ mycipher.sh encrypt my-file.pdf     # => x-my-file.pdf
-#      ╰─❯ mycipher.sh encrypt my-directory    # => x-my-directory
+#      ╰─❯ mycipher.sh encrypt my-directory    # => x-my-directory,dir
 #
 #   2. Manually copy the resulting SHA-256 hash and the encryption password
 #      into your 1Password entry for the encrypted file.
@@ -26,11 +26,11 @@
 #
 #   4. Periodically verify the encrypted file to detect corruption or bit rot by
 #      comparing its current SHA-256 with the hash you saved separately.
-#      ╰─❯ mycipher.sh verify x-my-directory <hash-from-1password>
+#      ╰─❯ mycipher.sh verify x-my-directory,dir <hash-from-1password>
 #
 #   5. Download an encrypted file and decrypt it. If you provide -v <hash>,
 #      the script verifies the encrypted file before decrypting it.
-#      ╰─❯ mycipher.sh decrypt -v <hash-from-1password> x-my-directory
+#      ╰─❯ mycipher.sh decrypt -v <hash-from-1password> x-my-directory,dir
 #
 # Password resolution:
 #   1. Uses -p <password> if provided.
@@ -42,8 +42,15 @@
 #   - Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
 #     output format.
 #   - Directories are tar-streamed before encryption.
-#   - Decryption uses the 'file' utility to heuristically detect whether the
-#     plaintext is a tar archive and extracts it if so.
+#   - New encrypted directories use the filename suffix ',dir' by default:
+#       x-<dirname>,dir
+#     This provides explicit directory metadata in the encrypted filename.
+#   - The suffix ',dir' is reserved for this purpose. To avoid ambiguous
+#     round-tripping, do not encrypt source directories whose basename already
+#     ends in ',dir'.
+#   - During decryption, directory detection prefers the ',dir' filename suffix.
+#     If the suffix is absent, the script falls back to tar-archive detection
+#     for backward compatibility with older encrypted directories.
 #   - Integrity verification is external: SHA-256 is computed over the encrypted
 #     file and compared with a separately stored expected hash.
 # ------------------------------------------------------------------------------
@@ -226,6 +233,7 @@ decrypt_target() {
     local pass=$3
     local temp_out="${output}.tmp"
     local err_msg=""
+    local is_directory=1
 
     if [[ -d "$target" ]]; then
         printf "Error: '%s' is a directory.\n" "$target" >&2
@@ -247,7 +255,13 @@ decrypt_target() {
         exit 1
     fi
 
-    if file "$temp_out" | grep -q "tar archive"; then
+    if [[ "$target" == *,dir ]]; then
+        is_directory=0
+    elif file "$temp_out" | grep -q "tar archive"; then
+        is_directory=0
+    fi
+
+    if [[ $is_directory -eq 0 ]]; then
         tar -xf "$temp_out" -C ./
         rm -f -- "$temp_out"
         printf '%s\n' "Directory decrypted and extracted."
@@ -266,8 +280,22 @@ run_verify() {
 
 run_encrypt() {
     prepare_target
+
+    if [[ -d "$TARGET" && "$BASE_NAME" == *,dir ]]; then
+        printf "Error: Source directory basename '%s' ends with reserved suffix ',dir'.\n" "$BASE_NAME" >&2
+        exit 1
+    fi
+
     PASSWORD=$(get_password "$OPT_PASS")
-    [[ -z "$OPT_OUT" ]] && OPT_OUT="./x-$BASE_NAME"
+
+    if [[ -z "$OPT_OUT" ]]; then
+        if [[ -d "$TARGET" ]]; then
+            OPT_OUT="./x-$BASE_NAME,dir"
+        else
+            OPT_OUT="./x-$BASE_NAME"
+        fi
+    fi
+
     encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
 }
 
@@ -290,6 +318,8 @@ run_decrypt() {
         else
             OPT_OUT="decrypted-$BASE_NAME"
         fi
+
+        [[ "$OPT_OUT" == *,dir ]] && OPT_OUT="${OPT_OUT%,dir}"
     fi
 
     decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
