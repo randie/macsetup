@@ -64,14 +64,14 @@ set -o pipefail
 # --- Global Configuration & State ---
 
 readonly OPENSSL="/opt/homebrew/bin/openssl"
-readonly PW_FILE="$HOME/.mycipher"
+readonly PASSWORD_FILE="$HOME/.mycipher"
 readonly PREFIX="x-"
 readonly SUFFIX=",dir"
 
 CMD=""            # encrypt | decrypt | verify
-OPT_PASS=""       # Password from -p
-OPT_OUT=""        # Output filename from -o
-EXPECTED_HASH=""  # Expected hash from -v or verify positional arg
+OPT_PASSWORD=""   # Password from -p
+OUTPUT=""         # Final output path from -o or derived default
+EXPECTED_HASH=""  # Expected hash from verify arg or decrypt -v
 TARGET=""         # Target path, normalized to remove any trailing slash
 BASE_NAME=""      # Basename derived from TARGET
 PASSWORD=""       # Resolved password string
@@ -107,19 +107,19 @@ prepare_target() {
 }
 
 get_password() {
-    local pass_arg=$1
-    local file_pass=""
-    local manual_pass=""
+    local password_arg=$1
+    local file_password=""
+    local manual_password=""
 
-    if [[ -n "$pass_arg" ]]; then
-        printf '%s' "$pass_arg"
-    elif [[ -f "$PW_FILE" ]]; then
-        IFS= read -r file_pass < "$PW_FILE"
-        printf '%s' "$file_pass"
+    if [[ -n "$password_arg" ]]; then
+        printf '%s' "$password_arg"
+    elif [[ -f "$PASSWORD_FILE" ]]; then
+        IFS= read -r file_password < "$PASSWORD_FILE"
+        printf '%s' "$file_password"
     else
-        read -r -s -p "Enter password: " manual_pass
+        read -r -s -p "Enter password: " manual_password
         printf '\n' >&2
-        printf '%s' "$manual_pass"
+        printf '%s' "$manual_password"
     fi
 }
 
@@ -151,8 +151,8 @@ parse_command_line() {
         encrypt)
             while getopts "p:o:" opt; do
                 case "$opt" in
-                    p) OPT_PASS=$OPTARG ;;
-                    o) OPT_OUT=$OPTARG ;;
+                    p) OPT_PASSWORD=$OPTARG ;;
+                    o) OUTPUT=$OPTARG ;;
                     *) usage ;;
                 esac
             done
@@ -164,8 +164,8 @@ parse_command_line() {
         decrypt)
             while getopts "p:o:v:" opt; do
                 case "$opt" in
-                    p) OPT_PASS=$OPTARG ;;
-                    o) OPT_OUT=$OPTARG ;;
+                    p) OPT_PASSWORD=$OPTARG ;;
+                    o) OUTPUT=$OPTARG ;;
                     v) EXPECTED_HASH=$OPTARG ;;
                     *) usage ;;
                 esac
@@ -215,64 +215,61 @@ verify_target() {
 encrypt_target() {
     local target=$1
     local output=$2
-    local pass=$3
+    local password=$3
 
     if [[ -d "$target" ]]; then
-        tar -cf - "$target" | "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -out "$output"
+        if ! tar -cf - "$target" | "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$password" -out "$output"; then
+            printf '%s\n' "Error: Encryption failed." >&2
+            exit 1
+        fi
     else
-        "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$output"
+        if ! "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$password" -in "$target" -out "$output"; then
+            printf '%s\n' "Error: Encryption failed." >&2
+            exit 1
+        fi
     fi
 
-    if [[ $? -eq 0 ]]; then
-        printf "Encryption complete: %s\n" "$output"
-        "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
-        printf '%s\n' "ACTION: MANUALLY copy this hash into 1Password."
-    else
-        printf '%s\n' "Error: Encryption failed." >&2
-        exit 1
-    fi
+    printf "Encryption complete: %s\n" "$output"
+    "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
+    printf '%s\n' "ACTION: MANUALLY copy this hash into 1Password."
 }
 
 decrypt_target() {
     local target=$1
     local output=$2
-    local pass=$3
-    local temp_out="${output}.tmp"
-    local err_msg=""
-    local is_directory=1
+    local password=$3
+    local temp_output="${output}.tmp"
+    local error_message=""
+    local should_extract_directory=false
 
     if [[ -d "$target" ]]; then
         printf "Error: '%s' is a directory.\n" "$target" >&2
         exit 1
     fi
 
-    trap 'rm -f -- "$temp_out"' EXIT
+    trap 'rm -f -- "$temp_output"' EXIT
 
-    err_msg=$("$OPENSSL" enc -aes-256-cbc -d -salt -pbkdf2 -pass "pass:$pass" -in "$target" -out "$temp_out" 2>&1)
-
-    if [[ $? -ne 0 ]]; then
-        if [[ "$err_msg" == *"bad decrypt"* ]]; then
+    if ! error_message=$("$OPENSSL" enc -aes-256-cbc -d -salt -pbkdf2 -pass "pass:$password" -in "$target" -out "$temp_output" 2>&1); then
+        if [[ "$error_message" == *"bad decrypt"* ]]; then
             printf '%s\n' "Error: Decryption failed. Incorrect password." >&2
-        elif [[ "$err_msg" == *"bad magic number"* ]]; then
+        elif [[ "$error_message" == *"bad magic number"* ]]; then
             printf "Error: '%s' is not a valid encrypted file.\n" "$target" >&2
         else
-            printf "Error: %s\n" "$err_msg" >&2
+            printf "Error: %s\n" "$error_message" >&2
         fi
         exit 1
     fi
 
-    if [[ "$target" == *"$SUFFIX" ]]; then
-        is_directory=0
-    elif file "$temp_out" | grep -q "tar archive"; then
-        is_directory=0
+    if [[ "$target" == *"$SUFFIX" ]] || file "$temp_output" | grep -q "tar archive"; then
+        should_extract_directory=true
     fi
 
-    if [[ $is_directory -eq 0 ]]; then
-        tar -xf "$temp_out" -C ./
-        rm -f -- "$temp_out"
+    if [[ "$should_extract_directory" == true ]]; then
+        tar -xf "$temp_output" -C ./
+        rm -f -- "$temp_output"
         printf '%s\n' "Directory decrypted and extracted."
     else
-        mv -- "$temp_out" "$output"
+        mv -- "$temp_output" "$output"
         printf "File decrypted: %s\n" "$output"
     fi
 
@@ -292,48 +289,47 @@ run_encrypt() {
         exit 1
     fi
 
-    PASSWORD=$(get_password "$OPT_PASS")
+    PASSWORD=$(get_password "$OPT_PASSWORD")
 
-    if [[ -n "$OPT_OUT" && ! -d "$TARGET" && "$(basename "$OPT_OUT")" == *"$SUFFIX" ]]; then
-        printf "Error: Custom encrypted output name '%s' must not end with reserved suffix '%s' for files.\n" "$(basename "$OPT_OUT")" "$SUFFIX" >&2
+    if [[ -n "$OUTPUT" && ! -d "$TARGET" && "$(basename "$OUTPUT")" == *"$SUFFIX" ]]; then
+        printf "Error: Custom encrypted output name '%s' must not end with reserved suffix '%s' for files.\n" "$(basename "$OUTPUT")" "$SUFFIX" >&2
         exit 1
     fi
 
-    if [[ -z "$OPT_OUT" ]]; then
+    if [[ -z "$OUTPUT" ]]; then
         if [[ -d "$TARGET" ]]; then
-            OPT_OUT="./${PREFIX}${BASE_NAME}${SUFFIX}"
+            OUTPUT="./${PREFIX}${BASE_NAME}${SUFFIX}"
         else
-            OPT_OUT="./${PREFIX}${BASE_NAME}"
+            OUTPUT="./${PREFIX}${BASE_NAME}"
         fi
     fi
 
-    encrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
+    encrypt_target "$TARGET" "$OUTPUT" "$PASSWORD"
 }
 
 run_decrypt() {
     prepare_target
 
     if [[ -n "$EXPECTED_HASH" ]]; then
-        verify_target "$TARGET" "$EXPECTED_HASH"
-        if [[ $? -ne 0 ]]; then
+        if ! verify_target "$TARGET" "$EXPECTED_HASH"; then
             printf '%s\n' "Aborting decryption due to integrity failure." >&2
             exit 1
         fi
     fi
 
-    PASSWORD=$(get_password "$OPT_PASS")
+    PASSWORD=$(get_password "$OPT_PASSWORD")
 
-    if [[ -z "$OPT_OUT" ]]; then
+    if [[ -z "$OUTPUT" ]]; then
         if [[ "$BASE_NAME" == "$PREFIX"* ]]; then
-            OPT_OUT="${BASE_NAME#"$PREFIX"}"
+            OUTPUT="${BASE_NAME#"$PREFIX"}"
         else
-            OPT_OUT="decrypted-$BASE_NAME"
+            OUTPUT="decrypted-$BASE_NAME"
         fi
 
-        [[ "$OPT_OUT" == *"$SUFFIX" ]] && OPT_OUT="${OPT_OUT%"$SUFFIX"}"
+        [[ "$OUTPUT" == *"$SUFFIX" ]] && OUTPUT="${OUTPUT%"$SUFFIX"}"
     fi
 
-    decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
+    decrypt_target "$TARGET" "$OUTPUT" "$PASSWORD"
 }
 
 #=======================#
