@@ -61,6 +61,8 @@ set -o pipefail
 
 readonly OPENSSL="/opt/homebrew/bin/openssl"
 readonly PW_FILE="$HOME/.mycipher"
+readonly PREFIX="x-"
+readonly SUFFIX=",dir"
 
 CMD=""            # encrypt | decrypt | verify
 OPT_PASS=""       # Password from -p
@@ -255,7 +257,7 @@ decrypt_target() {
         exit 1
     fi
 
-    if [[ "$target" == *,dir ]]; then
+    if [[ "$target" == *"$SUFFIX" ]]; then
         is_directory=0
     elif file "$temp_out" | grep -q "tar archive"; then
         is_directory=0
@@ -281,8 +283,8 @@ run_verify() {
 run_encrypt() {
     prepare_target
 
-    if [[ -d "$TARGET" && "$BASE_NAME" == *,dir ]]; then
-        printf "Error: Source directory basename '%s' ends with reserved suffix ',dir'.\n" "$BASE_NAME" >&2
+    if [[ -d "$TARGET" && "$BASE_NAME" == *"$SUFFIX" ]]; then
+        printf "Error: Your target directory's name must not end with the reserved suffix '%s'.\n" "$SUFFIX" >&2
         exit 1
     fi
 
@@ -290,9 +292,9 @@ run_encrypt() {
 
     if [[ -z "$OPT_OUT" ]]; then
         if [[ -d "$TARGET" ]]; then
-            OPT_OUT="./x-$BASE_NAME,dir"
+            OPT_OUT="./${PREFIX}${BASE_NAME}${SUFFIX}"
         else
-            OPT_OUT="./x-$BASE_NAME"
+            OPT_OUT="./${PREFIX}${BASE_NAME}"
         fi
     fi
 
@@ -313,13 +315,13 @@ run_decrypt() {
     PASSWORD=$(get_password "$OPT_PASS")
 
     if [[ -z "$OPT_OUT" ]]; then
-        if [[ "$BASE_NAME" == x-* ]]; then
-            OPT_OUT="${BASE_NAME#x-}"
+        if [[ "$BASE_NAME" == "$PREFIX"* ]]; then
+            OPT_OUT="${BASE_NAME#"$PREFIX"}"
         else
             OPT_OUT="decrypted-$BASE_NAME"
         fi
 
-        [[ "$OPT_OUT" == *,dir ]] && OPT_OUT="${OPT_OUT%,dir}"
+        [[ "$OPT_OUT" == *"$SUFFIX" ]] && OPT_OUT="${OPT_OUT%"$SUFFIX"}"
     fi
 
     decrypt_target "$TARGET" "$OPT_OUT" "$PASSWORD"
