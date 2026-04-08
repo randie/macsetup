@@ -234,6 +234,7 @@ alias bt='(cd ~ && gitb ls-files)'
 
 # --- mycipher.sh aliases ---
 alias mycipher='~/bin/mycipher.sh'
+alias tago='~/bin/mycipher.sh'
 alias enc='~/bin/mycipher.sh encrypt'
 alias dec='~/bin/mycipher.sh decrypt'
 alias decv='~/bin/mycipher.sh decrypt -v'
