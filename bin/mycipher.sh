@@ -33,21 +33,25 @@
 #      ╰─❯ mycipher.sh decrypt -v <hash-from-1password> x-my-directory,dir
 #
 # Password resolution:
-#   1. Uses -p <password> if provided.
-#   2. Else reads the first line of ~/.mycipher exactly as stored.
-#   3. Else prompts via hidden terminal input.
+#   1. Uses -p <password> if provided,
+#   2. else reads the first line of ~/.mycipher exactly as stored,
+#   3. else prompts via hidden terminal input.
 #
 # Implementation notes:
 #   - OpenSSL binary: /opt/homebrew/bin/openssl
 #   - Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
 #     output format.
 #   - Directories are tar-streamed before encryption.
-#   - New encrypted directories use the filename suffix ',dir' by default:
+#   - Encrypted directories are given the filename suffix ',dir' by default:
 #       x-<dirname>,dir
-#     This provides explicit directory metadata in the encrypted filename.
-#   - The suffix ',dir' is reserved for this purpose. To avoid ambiguous
-#     round-tripping, do not encrypt source directories whose basename already
-#     ends in ',dir'.
+#     This encodes encrypted-directory metadata in the filename so decrypt can
+#     distinguish encrypted directories from encrypted files.
+#   - The suffix ',dir' is reserved for encrypted-directory filename metadata.
+#     Source files whose basename ends in ',dir' are rejected, because their
+#     encrypted output would be misclassified as a directory and break decrypt.
+#   - Source directories may still end in ',dir'; that can produce names like
+#     x-foobar,dir,dir, which is weird-looking but is not logically incorrect.
+#   - Custom -o output names for encrypted files must not end in ',dir'.
 #   - During decryption, directory detection prefers the ',dir' filename suffix.
 #     If the suffix is absent, the script falls back to tar-archive detection
 #     for backward compatibility with older encrypted directories.
@@ -283,12 +287,17 @@ run_verify() {
 run_encrypt() {
     prepare_target
 
-    if [[ -d "$TARGET" && "$BASE_NAME" == *"$SUFFIX" ]]; then
-        printf "Error: Your target directory's name must not end with the reserved suffix '%s'.\n" "$SUFFIX" >&2
+    if [[ -f "$TARGET" && "$BASE_NAME" == *"$SUFFIX" ]]; then
+        printf "Error: Target filename '%s' must not end with reserved suffix '%s'.\n" "$BASE_NAME" "$SUFFIX" >&2
         exit 1
     fi
 
     PASSWORD=$(get_password "$OPT_PASS")
+
+    if [[ -n "$OPT_OUT" && ! -d "$TARGET" && "$(basename "$OPT_OUT")" == *"$SUFFIX" ]]; then
+        printf "Error: Custom encrypted output name '%s' must not end with reserved suffix '%s' for files.\n" "$(basename "$OPT_OUT")" "$SUFFIX" >&2
+        exit 1
+    fi
 
     if [[ -z "$OPT_OUT" ]]; then
         if [[ -d "$TARGET" ]]; then
