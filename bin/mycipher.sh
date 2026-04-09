@@ -127,7 +127,9 @@ get_password() {
 parse_verify_args() {
     local script_name="${0##*/}"
 
-    if [[ ${1:-} == -* || ${2:-} == -* ]]; then
+    if [[ ${1:-} == "--" ]]; then
+        shift
+    elif [[ ${1:-} == -* || ${2:-} == -* ]]; then
         printf '%s\n' "Error: verify does not accept options. Use: $script_name verify <encrypted_file> <expected_hash>" >&2
         usage
     fi
@@ -211,16 +213,31 @@ verify_target() {
     fi
 
     printf '%s\n' \
-        "SUCCESS: SHA-256 hash matches. Integrity comfirmed."
+        "SUCCESS: SHA-256 hash matches. Integrity confirmed."
 }
 
 encrypt_target() {
     local target=$1
     local output=$2
     local password=$3
+    local target_parent=""
+    local target_name=""
+
+    if [[ -e "$output" ]]; then
+        printf "Error: Output path '%s' already exists.\n" "$output" >&2
+        exit 1
+    fi
 
     if [[ -d "$target" ]]; then
-        if ! tar -cf - "$target" | "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$password" -out "$output"; then
+        target_name="${target##*/}"
+        if [[ "$target" == */* ]]; then
+            target_parent="${target%/*}"
+            [[ -z "$target_parent" ]] && target_parent="/"
+        else
+            target_parent="."
+        fi
+
+        if ! tar -C "$target_parent" -cf - "$target_name" | "$OPENSSL" enc -aes-256-cbc -salt -pbkdf2 -pass "pass:$password" -out "$output"; then
             printf '%s\n' "Error: Encryption failed." >&2
             exit 1
         fi
@@ -232,7 +249,7 @@ encrypt_target() {
     fi
 
     printf "Encryption complete: %s → %s\n" "$target" "$output"
-    printf "PASSWORD: %s\n" "from -p <password> | ~/.mycipher | prompt (in this precedence order)"
+    printf '%s\n' "PASSWORD: from -p <password> | ~/.mycipher | prompt (in this precedence order)"
     "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
     printf "TO DO: Copy password and SHA-256 hash to 1Password for %s\n" "$output"
 }
@@ -242,6 +259,9 @@ decrypt_target() {
     local output=$2
     local password=$3
     local temp_output="${output}.tmp"
+    local temp_extract_dir=""
+    local extracted_entries=()
+    local extracted_path=""
     local error_message=""
     local was_directory=false    # Was this encrypted file a directory?
 
@@ -250,7 +270,12 @@ decrypt_target() {
         exit 1
     fi
 
-    trap 'rm -f -- "$temp_output"' EXIT
+    if ! temp_extract_dir=$(mktemp -d); then
+        printf '%s\n' "Error: Failed to create temporary extraction directory." >&2
+        exit 1
+    fi
+
+    trap 'rm -f -- "$temp_output"; rm -rf -- "$temp_extract_dir"' EXIT
 
     if ! error_message=$("$OPENSSL" enc -aes-256-cbc -d -salt -pbkdf2 -pass "pass:$password" -in "$target" -out "$temp_output" 2>&1); then
         if [[ "$error_message" == *"bad decrypt"* ]]; then
@@ -268,14 +293,52 @@ decrypt_target() {
     fi
 
     if [[ "$was_directory" == true ]]; then
-        tar -xf "$temp_output" -C ./    # extract directory from tar file
+        if ! tar -xf "$temp_output" -C "$temp_extract_dir"; then
+            printf "Error: Failed to extract decrypted directory from '%s'.\n" "$target" >&2
+            exit 1
+        fi
+
+        mapfile -d '' -t extracted_entries < <(find "$temp_extract_dir" -mindepth 1 -maxdepth 1 -print0)
+
+        if [[ ${#extracted_entries[@]} -eq 0 ]]; then
+            printf "Error: Decrypted directory archive '%s' was empty.\n" "$target" >&2
+            exit 1
+        fi
+
+        if [[ ${#extracted_entries[@]} -ne 1 ]]; then
+            printf "Error: Decrypted directory archive '%s' contained multiple top-level entries.\n" "$target" >&2
+            exit 1
+        fi
+
+        extracted_path="${extracted_entries[0]}"
+
+        if [[ -e "$output" ]]; then
+            printf "Error: Output path '%s' already exists.\n" "$output" >&2
+            exit 1
+        fi
+
+        if ! mv -- "$extracted_path" "$output"; then
+            printf "Error: Failed to move decrypted directory to '%s'.\n" "$output" >&2
+            exit 1
+        fi
+
         rm -f -- "$temp_output"
     else
-        mv -- "$temp_output" "$output"
+        if [[ -e "$output" ]]; then
+            printf "Error: Output path '%s' already exists.\n" "$output" >&2
+            exit 1
+        fi
+
+        if ! mv -- "$temp_output" "$output"; then
+            printf "Error: Failed to write decrypted file to '%s'.\n" "$output" >&2
+            exit 1
+        fi
     fi
+
     printf "Decryption complete: %s → %s\n" "$target" "$output"
 
     trap - EXIT
+    rm -rf -- "$temp_extract_dir"
 }
 
 run_verify() {
