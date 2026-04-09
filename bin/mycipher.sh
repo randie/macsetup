@@ -232,7 +232,7 @@ encrypt_target() {
     fi
 
     printf "Encryption complete: %s → %s\n" "$target" "$output"
-    printf "PASSWORD: %s\n" "???" # TODO: print PASSWORD: password source"
+    printf "PASSWORD: %s\n" "from -p <password> | ~/.mycipher | prompt (in this precedence order)"
     "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
     printf "TO DO: Copy password and SHA-256 hash to 1Password for %s\n" "$output"
 }
