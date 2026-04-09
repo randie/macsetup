@@ -42,6 +42,10 @@
 #   • Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
 #     output format.
 #   • Directories are tar-streamed before encryption.
+#   • Encrypting '.' is not supported. Move up to the parent directory first
+#     and try again.
+#   • Encrypting '/' is not supported because it is too large and broad for
+#     this utility.
 #   • Encrypted directories are given the filename suffix ',dir' by default:
 #       x-<dirname>,dir
 #     This encodes encrypted-directory metadata in the filename so decrypt can
@@ -349,6 +353,16 @@ run_verify() {
 run_encrypt() {
     prepare_target
 
+    if [[ "$TARGET" == "." ]]; then
+        printf '%s\n' "Error: Encrypting '.' is not supported. Move up to the parent directory first and try again." >&2
+        exit 1
+    fi
+
+    if [[ "$TARGET" == "/" ]]; then
+        printf '%s\n' "Error: Encrypting '/' is not supported because it is too large and broad for this utility." >&2
+        exit 1
+    fi
+
     if [[ -f "$TARGET" && "$BASE_NAME" == *"$SUFFIX" ]]; then
         printf "Error: Target filename '%s' must not end with reserved suffix '%s'.\n" "$BASE_NAME" "$SUFFIX" >&2
         exit 1
@@ -412,3 +426,4 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         *) printf "Error: Unknown command '%s'\n" "$CMD" >&2; usage ;;
     esac
 fi
+
