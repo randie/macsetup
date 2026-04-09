@@ -80,7 +80,6 @@ PASSWORD=""       # Resolved password string
 
 usage() {
     local script_name="${0##*/}"
-
     printf '%s\n' \
         "Usage:" \
         "  $script_name encrypt [-p password] [-o output_file] <file_or_directory>" \
@@ -248,7 +247,7 @@ decrypt_target() {
     local password=$3
     local temp_output="${output}.tmp"
     local error_message=""
-    local should_extract_directory=false
+    local was_directory=false    # Was this encrypted file a directory?
 
     if [[ -d "$target" ]]; then
         printf "Error: '%s' is a directory.\n" "$target" >&2
@@ -269,11 +268,11 @@ decrypt_target() {
     fi
 
     if [[ "$target" == *"$SUFFIX" ]] || file "$temp_output" | grep -q "tar archive"; then
-        should_extract_directory=true
+        was_directory=true
     fi
 
-    if [[ "$should_extract_directory" == true ]]; then
-        tar -xf "$temp_output" -C ./
+    if [[ "$was_directory" == true ]]; then
+        tar -xf "$temp_output" -C ./    # extract directory from tar file
         rm -f -- "$temp_output"
         printf '%s\n' "Directory decrypted and extracted."
     else
@@ -349,10 +348,9 @@ run_decrypt() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     parse_command_line "$@"
     case "$CMD" in
-        verify)  run_verify  ;;
         encrypt) run_encrypt ;;
         decrypt) run_decrypt ;;
+        verify)  run_verify  ;;
         *) printf "Error: Unknown command '%s'\n" "$CMD" >&2; usage ;;
     esac
 fi
-
