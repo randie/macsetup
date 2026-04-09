@@ -274,6 +274,16 @@ decrypt_target() {
         exit 1
     fi
 
+    if [[ -e "$output" ]]; then
+        printf "Error: Output path '%s' already exists.\n" "$output" >&2
+        exit 1
+    fi
+
+    if [[ -e "$temp_output" ]]; then
+        printf "Error: Temporary output path '%s' already exists.\n" "$temp_output" >&2
+        exit 1
+    fi
+
     if ! temp_extract_dir=$(mktemp -d); then
         printf '%s\n' "Error: Failed to create temporary extraction directory." >&2
         exit 1
@@ -316,11 +326,6 @@ decrypt_target() {
 
         extracted_path="${extracted_entries[0]}"
 
-        if [[ -e "$output" ]]; then
-            printf "Error: Output path '%s' already exists.\n" "$output" >&2
-            exit 1
-        fi
-
         if ! mv -- "$extracted_path" "$output"; then
             printf "Error: Failed to move decrypted directory to '%s'.\n" "$output" >&2
             exit 1
@@ -328,11 +333,6 @@ decrypt_target() {
 
         rm -f -- "$temp_output"
     else
-        if [[ -e "$output" ]]; then
-            printf "Error: Output path '%s' already exists.\n" "$output" >&2
-            exit 1
-        fi
-
         if ! mv -- "$temp_output" "$output"; then
             printf "Error: Failed to write decrypted file to '%s'.\n" "$output" >&2
             exit 1
