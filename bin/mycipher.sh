@@ -38,24 +38,24 @@
 #   3. else prompts via hidden terminal input.
 #
 # Implementation notes:
-#   - OpenSSL binary: /opt/homebrew/bin/openssl
-#   - Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
+#   • OpenSSL binary: /opt/homebrew/bin/openssl
+#   • Cipher: AES-256-CBC with PBKDF2 and a random salt stored in the OpenSSL
 #     output format.
-#   - Directories are tar-streamed before encryption.
-#   - Encrypted directories are given the filename suffix ',dir' by default:
+#   • Directories are tar-streamed before encryption.
+#   • Encrypted directories are given the filename suffix ',dir' by default:
 #       x-<dirname>,dir
 #     This encodes encrypted-directory metadata in the filename so decrypt can
 #     distinguish encrypted directories from encrypted files.
-#   - The suffix ',dir' is reserved for encrypted-directory filename metadata.
+#   • The suffix ',dir' is reserved for encrypted-directory filename metadata.
 #     Source files whose basename ends in ',dir' are rejected, because their
 #     encrypted output would be misclassified as a directory and break decrypt.
-#   - Source directories may still end in ',dir'; that can produce names like
+#   • Source directories may still end in ',dir'; that can produce names like
 #     x-foobar,dir,dir, which is weird-looking but is not logically incorrect.
-#   - Custom -o output names for encrypted files must not end in ',dir'.
-#   - During decryption, directory detection prefers the ',dir' filename suffix.
+#   • Custom -o output names for encrypted files must not end in ',dir'.
+#   • During decryption, directory detection prefers the ',dir' filename suffix.
 #     If the suffix is absent, the script falls back to tar-archive detection
 #     for backward compatibility with older encrypted directories.
-#   - Integrity verification is external: SHA-256 is computed over the encrypted
+#   • Integrity verification is external: SHA-256 is computed over the encrypted
 #     file and compared with a separately stored expected hash.
 # ------------------------------------------------------------------------------
 
@@ -202,21 +202,16 @@ verify_target() {
 
     actual=$("$OPENSSL" dgst -sha256 "$target" | awk '{print $NF}')
 
-    printf -- "--- Integrity Report for: %s ---\n" "$target"
-
-    if [[ "$actual" == "$expected" ]]; then
+    if [[ "$actual" != "$expected" ]]; then
         printf '%s\n' \
-            "SUCCESS: Integrity confirmed. Hash matches." \
-            "---------------------------------------"
-        return 0
+            "FAILURE:       SHA-256 hash does not match. Integrity compromised." \
+            "ACTUAL HASH:   $actual" \
+            "EXPECTED HASH: $expected"
+        return 1
     fi
 
     printf '%s\n' \
-        "ACTUAL:   $actual" \
-        "EXPECTED: $expected" \
-        "---------------------------------------" \
-        "FAILURE: HASH MISMATCH! The file may be corrupted."
-    return 1
+        "SUCCESS: SHA-256 hash matches. Integrity comfirmed."
 }
 
 encrypt_target() {
@@ -236,9 +231,10 @@ encrypt_target() {
         fi
     fi
 
-    printf "Encryption complete: %s\n" "$output"
+    printf "Encryption complete: %s → %s\n" "$target" "$output"
+    printf "PASSWORD: %s\n" "???" # TODO: print PASSWORD: password source"
     "$OPENSSL" dgst -sha256 "$output" | awk '{print "SHA-256: " $NF}'
-    printf '%s\n' "ACTION: MANUALLY copy this hash into 1Password."
+    printf "TO DO: Copy password and SHA-256 hash to 1Password for %s\n" "$output"
 }
 
 decrypt_target() {
@@ -250,7 +246,7 @@ decrypt_target() {
     local was_directory=false    # Was this encrypted file a directory?
 
     if [[ -d "$target" ]]; then
-        printf "Error: '%s' is a directory.\n" "$target" >&2
+        printf "Error: '%s' is a directory, not a valid encrypted file.\n" "$target" >&2
         exit 1
     fi
 
@@ -274,11 +270,10 @@ decrypt_target() {
     if [[ "$was_directory" == true ]]; then
         tar -xf "$temp_output" -C ./    # extract directory from tar file
         rm -f -- "$temp_output"
-        printf '%s\n' "Directory decrypted and extracted."
     else
         mv -- "$temp_output" "$output"
-        printf "File decrypted: %s\n" "$output"
     fi
+    printf "Decryption complete: %s → %s\n" "$target" "$output"
 
     trap - EXIT
 }
