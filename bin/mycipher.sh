@@ -351,6 +351,10 @@ run_verify() {
 }
 
 run_encrypt() {
+    local target_dir_abs=""
+    local output_dir_abs=""
+    local output_path_abs=""
+
     prepare_target
 
     if [[ "$TARGET" == "." ]]; then
@@ -381,6 +385,27 @@ run_encrypt() {
         else
             OUTPUT="./${PREFIX}${BASE_NAME}"
         fi
+    fi
+
+    if [[ -d "$TARGET" ]]; then
+        if ! target_dir_abs=$(cd -- "$TARGET" && pwd -P); then
+            printf "Error: Failed to resolve target directory '%s'.\n" "$TARGET" >&2
+            exit 1
+        fi
+
+        if ! output_dir_abs=$(cd -- "${OUTPUT%/*}" 2>/dev/null && pwd -P); then
+            printf "Error: Output directory '%s' does not exist.\n" "${OUTPUT%/*}" >&2
+            exit 1
+        fi
+
+        output_path_abs="${output_dir_abs}/${OUTPUT##*/}"
+
+        case "$output_path_abs" in
+            "$target_dir_abs"/*)
+                printf "Error: Output path '%s' must not be inside target directory '%s'.\n" "$OUTPUT" "$TARGET" >&2
+                exit 1
+                ;;
+        esac
     fi
 
     encrypt_target "$TARGET" "$OUTPUT" "$PASSWORD"
