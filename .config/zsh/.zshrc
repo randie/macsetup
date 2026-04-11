@@ -169,8 +169,10 @@ alias rm='rm -i'
 alias la='ls -a'
 alias l1='ls -1'
 alias la1='ls -a1'
+alias l1a='ls -a1'
 alias ll='ls -l'
 alias lla='ls -la'
+alias lal='ls -la'
 alias d='dirs -v'
 alias dirs='dirs -v'
 alias da='direnv allow'
@@ -234,10 +236,15 @@ alias bt='(cd ~ && gitb ls-files)'
 
 # --- mycipher.sh aliases ---
 alias mycipher='~/bin/mycipher.sh'
-alias tago='~/bin/mycipher.sh'
 alias enc='~/bin/mycipher.sh encrypt'
 alias dec='~/bin/mycipher.sh decrypt'
 alias decv='~/bin/mycipher.sh decrypt -v'
+alias ver='~/bin/mycipher.sh verify'
+alias tago='~/bin/mycipher.sh'
+
+# ---------------------------- Convenience Env Vars ----------------------------
+
+export c='/Users/randie/Library/Mobile Documents/com~apple~CloudDocs'
 
 # ---------------------------- Powerlevel10k prompt ----------------------------
 
