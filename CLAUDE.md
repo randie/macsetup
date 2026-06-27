@@ -40,16 +40,18 @@ $HOME/bin/macsetup.sh --help
 ```
 
 ### Working with the Bare Repo
-The `c` alias is used for all git operations on this repo:
+The $HOME work tree was checked out from $HOME/macsetup-bare bare repo.
+The `b` alias is used for all git operations on this repo ($HOME):
 ```bash
-alias c='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
+alias gitb='git --no-pager --git-dir=$HOME/macsetup-bare --work-tree=$HOME'
+alias b='gitb'  
 
-c status -s     # cs - short status
-c add <file>    # ca - stage file
-c commit -v     # ci - verbose commit
-c checkout      # co - checkout
-c push          # cpu - push
-c ls-tree --full-tree -r --name-only HEAD  # cls - list all tracked files
+b status -s     # bss - short status
+b add <file>    # ba - stage file
+b commit -v     # bci - commit / checkin
+b checkout      # bco - checkout
+b push          # bp - push
+b ls-tree --full-tree -r --name-only HEAD  # bls - list all tracked files
 ```
 
 ### Homebrew
