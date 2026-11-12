@@ -1,9 +1,10 @@
+# ~/.config/zsh/.zshrc
 # ==============================================================================
 #                              Zsh Configuration
 #                       (Intel + Apple Silicon friendly)
 # ==============================================================================
 
-# NOTE: This is an XDG-friendly Zsh config. XDG_* env vars are set in ~/.zshenv.
+# NOTE: This is an XDG-friendly Zsh config. XDG_* env vars are set in .zshenv .
 
 # ----------------------- Powerlevel10k instant prompt -------------------------
 
@@ -153,9 +154,10 @@ else
   _zshinit_log "history-substring-search plugin not loaded; skipping key bindings."
 fi
 
-# Initialize completions *after* plugins adjust $fpath
+# Initialize zsh completions *after* plugins add their completion directories to $fpath
 autoload -Uz compinit || _zshinit_log "autoload of compinit failed; completions may be broken."
-compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
+#compinit -u || _zshinit_log "compinit -u failed; command-line completions may not work."
+compinit -u -d "$XDG_CACHE_HOME/zsh/.zcompdump" || _zshinit_log "compinit -u failed; command-line completions may not work."
 
 # Case-insensitive completion (so "desk" + tab can complete to "Desktop")
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
@@ -173,6 +175,8 @@ alias l1a='ls -a1'
 alias ll='ls -l'
 alias lla='ls -la'
 alias lal='ls -la'
+alias lr='ls -R1'
+alias lrt='ls -lrt'
 alias lt='ls -lT'
 alias d='dirs -v'
 alias dirs='dirs -v'
