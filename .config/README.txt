@@ -2,6 +2,8 @@
 # These files are git source-controlled [261112]
 #------------------------------------------------
 
+.config/README.txt
+
 .config/brew/Brewfile
 .config/brew/Brewfile_arm64
 .config/brew/Brewfile_x86_64
