@@ -237,7 +237,14 @@ alias blog='gitb log --oneline --decorate --graph'
 alias bl='blog -10'
 alias blol="gitb log --graph --pretty='%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset'"
 alias bls='gitb ls-tree --full-tree -r --name-only HEAD'
-alias bt='(cd ~ && gitb ls-files)'
+#alias bt='gitb ls-files --full-name'
+#alias bu='gitb ls-files --full-name --others --exclude-standard --'
+bt() {
+  gitb ls-files --full-name "$@" | sed "s|^|$HOME/|"
+}
+bu() {
+  gitb ls-files --full-name --others --exclude-standard -- "$@" | sed "s|^|$HOME/|"
+}
 
 # --- mycipher.sh aliases ---
 alias mycipher='~/bin/mycipher.sh'
