@@ -1,4 +1,4 @@
-# ~/.zshenv — earliest zsh startup file
+# ~/.config/zsh/.zshenv — the first zsh startup file to run
 
 set -o allexport
 
@@ -9,6 +9,10 @@ XDG_DATA_HOME="$HOME/.local/share"
 XDG_STATE_HOME="$HOME/.local/state"
 [[ -o login ]] && mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" || true
 
+# tell zsh where to find its configuration files
+ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+[[ -o login ]] && mkdir -p "$ZDOTDIR/functions" || true
+
 # globally useful to both interactive and non-interactive shells
 HOMEBREW_CACHE="$XDG_CACHE_HOME/Homebrew"
 HOMEBREW_BUNDLE_FILE="$XDG_CONFIG_HOME/brew/Brewfile"
@@ -16,32 +20,32 @@ INPUTRC="$XDG_CONFIG_HOME/readline/inputrc"
 GIT_CONFIG_GLOBAL="$XDG_CONFIG_HOME/git/config"
 [[ -o login ]] && mkdir -p "$HOMEBREW_CACHE" "${HOMEBREW_BUNDLE_FILE%/*}" "${INPUTRC%/*}" "${GIT_CONFIG_GLOBAL%/*}" || true
 
-# Tell zsh where to find its dotfiles
-ZDOTDIR="$XDG_CONFIG_HOME/zsh"
-[[ -o login ]] && mkdir -p "$ZDOTDIR/functions" || true
-
-# Better xtrace prefix: file:line:function> (only used when you `set -x`)
+# better xtrace prefix: file:line:function> (only used when you `set -x`)
 PS4='+%N:%i:${funcstack[1]:-main}> '
 
 set +o allexport
 
 # ------------------------------ history (XDG) ---------------------------------
 
+# zsh_histfile will be referenced downstream, in ~/.config/zsh/.zshrc
 typeset -g zsh_histfile="$XDG_STATE_HOME/zsh/history"
-mkdir -p -- "${zsh_histfile:h}" 2>/dev/null || true
-touch -- "$zsh_histfile" 2>/dev/null || true
-chmod 600 -- "$zsh_histfile" 2>/dev/null || true
-# Note, zsh_histfile will be referenced downstream, in .config/zsh/.zshrc.
+if [[ -o interactive ]]; then
+  mkdir -p -- "${zsh_histfile:h}" 2>/dev/null || true
+  touch -- "$zsh_histfile" 2>/dev/null || true
+  chmod 600 -- "$zsh_histfile" 2>/dev/null || true
+fi
 
 # ------------------------------ zshinit logging -------------------------------
 
-# Log file for zsh initialization issues
+# log file for zsh initialization issues
 typeset -g ZSHINIT_LOG="$XDG_STATE_HOME/zsh/zshinit.log"
-mkdir -p -- "${ZSHINIT_LOG:h}" 2>/dev/null || true
-touch -- "$ZSHINIT_LOG" 2>/dev/null || true
-chmod 600 -- "$ZSHINIT_LOG" 2>/dev/null || true
+if [[ -o interactive ]]; then
+  mkdir -p -- "${ZSHINIT_LOG:h}" 2>/dev/null || true
+  touch -- "$ZSHINIT_LOG" 2>/dev/null || true
+  chmod 600 -- "$ZSHINIT_LOG" 2>/dev/null || true
+fi
 
-# Number of issues encountered during zsh initialization (used by P10K prompt in ~/.config/zsh/p10k/.p10k.zsh)
+# number of issues encountered during zsh initialization (used by P10K prompt in ~/.config/zsh/p10k/.p10k.zsh)
 typeset -gi ZSHINIT_NUM_ERRORS=0
 
 # ---
