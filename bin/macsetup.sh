@@ -529,7 +529,8 @@ chsh_to_zsh() {
 
 apply_my_config() {
   # Hide untracked files in status
-  git --git-dir="$BARE_REPO" --work-tree="$HOME" config --local status.showUntrackedFiles no
+  #git --git-dir="$BARE_REPO" --work-tree="$HOME" config --local status.showUntrackedFiles no
+  git --git-dir="$BARE_REPO" config status.showUntrackedFiles no
 
   # Check out dotfiles from the bare repo into $HOME
   if git --git-dir="$BARE_REPO" --work-tree="$HOME" checkout -f; then
